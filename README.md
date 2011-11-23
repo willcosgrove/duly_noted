@@ -1,5 +1,5 @@
 #Duly Noted
-Duly noted is a red is backed stats and metrics tracker.  It works as follows:
+Duly noted is a redis backed stats and metrics tracker.  It works as follows:
 
     DulyNoted.track("page_views", for: "homepage")
 

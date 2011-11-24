@@ -1,96 +1,307 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset='utf-8'>
-
-  <title>willcosgrove/duly_noted @ GitHub</title>
-
-  <style type="text/css">
-    body {
-      margin-top: 1.0em;
-      background-color: #9a1651;
-      font-family: Helvetica, Arial, FreeSans, san-serif;
-      color: #ffffff;
-    }
-    #container {
-      margin: 0 auto;
-      width: 700px;
-    }
-    h1 { font-size: 3.8em; color: #65e9ae; margin-bottom: 3px; }
-    h1 .small { font-size: 0.4em; }
-    h1 a { text-decoration: none }
-    h2 { font-size: 1.5em; color: #65e9ae; }
-    h3 { text-align: center; color: #65e9ae; }
-    a { color: #65e9ae; }
-    .description { font-size: 1.2em; margin-bottom: 30px; margin-top: 30px; font-style: italic;}
-    .download { float: right; }
-    pre { background: #000; color: #fff; padding: 15px;}
-    hr { border: 0; width: 80%; border-bottom: 1px solid #aaa}
-    .footer { text-align:center; padding-top:30px; font-style: italic; }
-  </style>
+  <meta http-equiv="content-type" content="text/html;charset=utf-8">
+  <title>duly_noted.rb</title>
+  <link rel="stylesheet" href="http://jashkenas.github.com/docco/resources/docco.css">
 </head>
-
 <body>
-  <a href="https://github.com/willcosgrove/duly_noted"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png" alt="Fork me on GitHub" /></a>
+<div id='container'>
+  <div id="background"></div>
+  <table cellspacing=0 cellpadding=0>
+  <thead>
+    <tr>
+      <th class=docs><h1>duly_noted.rb</h1></th>
+      <th class=code></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr id='section-1'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-1">&#182;</a>
+        </div>
+        <p>Duly noted is a redis backed stats and metrics tracker.  It works as follows:</p>
 
-  <div id="container">
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;)
+</code></pre>
 
-    <div class="download">
-      <a href="https://github.com/willcosgrove/duly_noted/zipball/master">
-        <img border="0" width="90" src="https://github.com/images/modules/download/zip.png"></a>
-      <a href="https://github.com/willcosgrove/duly_noted/tarball/master">
-        <img border="0" width="90" src="https://github.com/images/modules/download/tar.png"></a>
-    </div>
+<p>This would log one page view for the home page.  Then to see how many page views the home page has gotten, you would simply call:</p>
 
-    <h1><a href="https://github.com/willcosgrove/duly_noted">duly_noted</a>
-      <span class="small">by <a href="https://github.com/willcosgrove">willcosgrove</a></span></h1>
+<pre><code>DulyNoted.count(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;)
+</code></pre>
 
-    <div class="description">
-      A redis backed metric tracking tool: duly noted.
-    </div>
+<p>You can also store meta data with your metrics by passing your data in a hash to the <code>meta</code> key like so:</p>
 
-    
-      <p>I didn't pick this page color</p>
-    
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  meta: {
+    user_agent: &ldquo;Mozilla/5.0 (Macintosh; Intel Mac OS X 10_7_2)&hellip;&rdquo;,
+    ip_address: &ldquo;128.194.3.138&rdquo;
+  })
+</code></pre>
 
-    
-      <h2>Dependencies</h2>
-      <p>redis</p>
-    
+<p>If the metric was generated in the past but is just now being logged, you can alter it&rsquo;s time stamp with the <code>generated_at</code> key:</p>
 
-    
-      <h2>Install</h2>
-      <p>Don't do it</p>
-    
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  generated_at: 10.minutes.ago)
+</code></pre>
 
-    
+<p>To get the count for a particular time range, you can use the <code>time_start</code> and <code>time_end</code> keys in the count call like so:</p>
 
-    
-      <h2>Authors</h2>
-      <p>Will Cosgrove (will@willcosgrove.com)<br/>      </p>
-    
+<pre><code>DulyNoted.count(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  time_start: 1.day.ago,
+  time_end: Time.now)
+</code></pre>
 
-    
-      <h2>Contact</h2>
-      <p> (jesusfreak210@gmail.com)<br/>      </p>
-    
+<p>This will return the page view count for the home page for the past day.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Dependency'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Dependency">&#182;</a>
+        </div>
+        <h2>Dependency</h2>
 
-    <h2>Download</h2>
-    <p>
-      You can download this project in either
-      <a href="https://github.com/willcosgrove/duly_noted/zipball/master">zip</a> or
-      <a href="https://github.com/willcosgrove/duly_noted/tarball/master">tar formats.
-    </p>
-    <p>You can also clone the project with <a href="http://git-scm.com">Git</a>
-      by running:
-      <pre>$ git clone git://github.com/willcosgrove/duly_noted</pre>
-    </p>
+<ul>
+<li>Redis</li>
+</ul>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="nb">require</span> <span class="s2">&quot;redis&quot;</span>
+<span class="nb">require</span> <span class="s2">&quot;uri&quot;</span>
+<span class="nb">require</span> <span class="s2">&quot;duly_noted/helpers&quot;</span>
+<span class="nb">require</span> <span class="s2">&quot;duly_noted/version&quot;</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-3'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-3">&#182;</a>
+        </div>
+        <p>The <strong>DulyNoted</strong> module contains four main methods:</p>
 
-    <div class="footer">
-      get the source code on GitHub : <a href="https://github.com/willcosgrove/duly_noted">willcosgrove/duly_noted</a>
-    </div>
+<ul>
+<li><code>track</code></li>
+<li><code>update</code></li>
+<li><code>query</code></li>
+<li><code>count</code></li>
+</ul>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre><span class="k">module</span> <span class="nn">DulyNoted</span>
+  <span class="kp">extend</span> <span class="nb">self</span> <span class="c1"># the following are class methods</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-Track'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Track">&#182;</a>
+        </div>
+        <h2>Track</h2>
 
-  </div>
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(optional), <code>generated_at</code>(optional), <code>meta</code>(optional), <code>ref_id</code>(optional)</em></p>
 
+<p><code>metric_name</code>: The name of the metric to track, ex: <code>page_views</code>, <code>downloads</code></p>
+
+<p><code>for</code><em>(optional)</em>: A name space for your metric, ex: <code>home_page</code></p>
+
+<p><code>generated_at</code><em>(optional)</em>: If the metric was generated in the past but is just now being logged, you can set the time it was generated at</p>
+
+<p><code>meta</code><em>(optional)</em>: A hash with whatever meta data fields you might want to store, ex: <code>ip_address</code>, <code>file_type</code></p>
+
+<p><code>ref_id</code><em>(optional)</em>: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>    
+  <span class="k">def</span> <span class="nf">track</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="p">{</span><span class="n">generated_at</span><span class="p">:</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span><span class="p">}</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
+    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zadd</span> <span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span>
+    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">set</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">key</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span> <span class="c1"># set alias key</span>
+    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">mapped_hmset</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="c1"># set meta data</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-Update'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Update">&#182;</a>
+        </div>
+        <h2>Update</h2>
+
+<p><em>parameters: <code>metric_name</code>, <code>ref_id</code>, <code>for</code>(required if set when created), <code>meta</code>(optional)</em></p>
+
+<p>The meta hash will not overwrite the old meta hash but be merged with it, with the new one overwriting conflicts.</p>
+
+<p><code>metric_name</code>: The name of the metric to track, ex: <code>page_views</code>, <code>downloads</code></p>
+
+<p><code>ref_id</code>: The reference ID that you set when you called <code>track</code></p>
+
+<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
+
+<p><code>meta</code><em>(optional)</em>: A hash with whatever meta data fields you might want to store, or update ex: <code>ip_address</code>, <code>file_type</code>, <code>time_left</code></p>
+
+<h3>Usage</h3>
+
+<pre><code>DulyNoted.update(&ldquo;page_views&rdquo;,
+  &ldquo;a_unique_id&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  meta: { time_on_page: 30 })
+</code></pre>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  
+  <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">ref_id</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">real_key</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">get</span> <span class="n">key</span>
+    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">mapped_hmset</span> <span class="n">real_key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> 
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-Query'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Query">&#182;</a>
+        </div>
+        <h2>Query</h2>
+
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(required if set when created), <code>time_start</code>(optional), <code>time_end</code>(optional)</em></p>
+
+<p>Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.</p>
+
+<p><code>metric_name</code>: The name of the metric to query, ex: <code>page_views</code>, <code>downloads</code></p>
+
+<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
+
+<p><code>time_start</code><em>(optional)</em>: The start of the time range to grab the data from.</p>
+
+<p><code>time_end</code><em>(optional)</em>: The end of the time range to grab the data from.</p>
+
+<h3>Usage</h3>
+
+<pre><code>DulyNoted.query(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  time_start: 1.day.ago,
+  time_end: Time.now)
+</code></pre>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  
+  <span class="k">def</span> <span class="nf">query</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+      <span class="n">results</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrevrangebyscore</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span> <span class="k">do</span> <span class="o">|</span><span class="n">metric</span><span class="o">|</span>
+        <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hgetall</span> <span class="n">metric</span>
+      <span class="k">end</span>
+    <span class="k">else</span>
+      <span class="n">results</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrevrange</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span> <span class="k">do</span> <span class="o">|</span><span class="n">metric</span><span class="o">|</span>
+        <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hgetall</span> <span class="n">metric</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
+    <span class="k">return</span> <span class="n">results</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-Count'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Count">&#182;</a>
+        </div>
+        <h2>Count</h2>
+
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(required if set when created), <code>time_start</code>(optional), <code>time_end</code>(optional)</em></p>
+
+<p>Count will return the number of events logged in a given time range, or if no time range is given, the total count.</p>
+
+<p><code>metric_name</code>: The name of the metric to query, ex: <code>page_views</code>, <code>downloads</code></p>
+
+<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
+
+<p><code>time_start</code><em>(optional)</em>: The start of the time range to grab the data from.</p>
+
+<p><code>time_end</code><em>(optional)</em>: The end of the time range to grab the data from.</p>
+
+<h3>Usage</h3>
+
+<pre><code>DulyNoted.count(&ldquo;page_views&rdquo;,
+  for: &ldquo;home_page&rdquo;,
+  time_start: 1.day.ago,
+  time_end: Time.now)
+</code></pre>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  
+  <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+      <span class="k">return</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcount</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
+    <span class="k">else</span> 
+      <span class="k">return</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcard</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">end</span>
+  <span class="k">end</span>
+  </pre></div>
+      </td>
+    </tr>
+    <tr id='section-Redis'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Redis">&#182;</a>
+        </div>
+        <h2>Redis</h2>
+
+<p>DulyNoted will try to connect to Redis&rsquo;s default url and port if you don&rsquo;t specify a Redis connection URL. You can set the url with the method</p>
+
+<pre><code>DulyNoted.redis = REDIS_URL
+</code></pre>
+
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  
+  <span class="k">def</span> <span class="nf">redis</span><span class="o">=</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+    <span class="vi">@redis</span> <span class="o">=</span> <span class="kp">nil</span>
+    <span class="vi">@redis_url</span> <span class="o">=</span> <span class="n">url</span>
+    <span class="n">redis</span>
+  <span class="k">end</span>
+
+  <span class="k">def</span> <span class="nf">redis</span>
+    <span class="vi">@redis</span> <span class="o">||=</span> <span class="p">(</span>
+      <span class="n">url</span> <span class="o">=</span> <span class="no">URI</span><span class="p">(</span><span class="vi">@redis_url</span> <span class="o">||</span> <span class="s2">&quot;redis://127.0.0.1:6379/0&quot;</span><span class="p">)</span>
+
+      <span class="o">::</span><span class="no">Redis</span><span class="o">.</span><span class="n">new</span><span class="p">({</span>
+        <span class="ss">:host</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+        <span class="ss">:port</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+        <span class="ss">:db</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">path</span><span class="o">[</span><span class="mi">1</span><span class="o">.</span><span class="n">.</span><span class="o">-</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>
+        <span class="ss">:password</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">password</span>
+      <span class="p">})</span>
+    <span class="p">)</span>
+  <span class="k">end</span>
+  
+  <span class="kp">private</span>
+  
+  <span class="k">def</span> <span class="nf">normalize</span><span class="p">(</span><span class="n">str</span><span class="p">)</span>
+    <span class="n">str</span><span class="o">.</span><span class="n">downcase</span><span class="o">.</span><span class="n">gsub</span><span class="p">(</span><span class="sr">/[^a-z0-9 ]/i</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span>
+  <span class="k">end</span>
+<span class="k">end</span></pre></div>
+      </td>
+    </tr>
+  </table>
+</div>
 </body>
-</html>

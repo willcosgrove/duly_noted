@@ -42,11 +42,11 @@ describe DulyNoted do
       DulyNoted.count("page_views").should eq(10)
     end
     it "can count all of one type between a time range" do
-      5.times { DulyNoted.track "page_views", for: "home" }
-      5.times { DulyNoted.track "page_views", for: "contact_us" }
+      5.times { DulyNoted.track "page_views", :for => "home" }
+      5.times { DulyNoted.track "page_views", :for => "contact_us" }
       sleep 0.2
-      5.times { DulyNoted.track "page_views", for: "home" }
-      5.times { DulyNoted.track "page_views", for: "contact_us" }
+      5.times { DulyNoted.track "page_views", :for => "home" }
+      5.times { DulyNoted.track "page_views", :for => "contact_us" }
       DulyNoted.count("page_views", :time_start => Time.now-0.2, :time_end => Time.now).should eq(10)
       DulyNoted.count("page_views", :time_range => Time.now-0.2..Time.now).should eq(10)
     end

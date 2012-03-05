@@ -6,8 +6,8 @@ describe DulyNoted do
   end
   describe "#track" do
     it "keeps an accurate count of events" do
-      6000.times { DulyNoted.track "page_views" }
-      DulyNoted.count("page_views").should eq(6000)
+      20.times { DulyNoted.track "page_views" }
+      DulyNoted.count("page_views").should eq(20)
     end
     it "separates by context" do
       20.times { DulyNoted.track "page_views", :for => "home" }

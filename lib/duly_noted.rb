@@ -66,7 +66,7 @@ module DulyNoted
   # `ref_id`_(optional)_: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric
     
   def track(metric_name, options={})
-    options = {generated_at: Time.now}.merge(options)
+    options = {:generated_at => Time.now}.merge(options)
     key = normalize(metric_name)
     key << ":#{options[:for]}" if options[:for]
     DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"

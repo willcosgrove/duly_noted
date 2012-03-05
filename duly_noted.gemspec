@@ -16,4 +16,6 @@ Gem::Specification.new do |gem|
   gem.version       = DulyNoted::VERSION
   gem.add_dependency("redis")
   gem.add_development_dependency("rspec")
+  gem.add_development_dependency("pry")
+  gem.add_development_dependency("chronic")
 end

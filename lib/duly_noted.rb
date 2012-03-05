@@ -39,6 +39,7 @@ require "redis"
 require "uri"
 require "duly_noted/helpers"
 require "duly_noted/version"
+require 'pry'
 
 # The **DulyNoted** module contains four main methods:
 # 
@@ -69,7 +70,7 @@ module DulyNoted
     key = normalize(metric_name)
     key << ":#{options[:for]}" if options[:for]
     DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
-    DulyNoted.redis.set "#{normalize(metric_name)}:#{options[:for]}:#{options[:ref_id]}", key if options[:ref_id] # set alias key
+    DulyNoted.redis.set "#{key}:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
     DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta] if options[:meta] # set meta data
   end
   
@@ -151,17 +152,28 @@ module DulyNoted
   # `time_start`_(optional)_: The start of the time range to grab the data from.
   # 
   # `time_end`_(optional)_: The end of the time range to grab the data from.
+  #
+  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
   # 
   # ###Usage
   # 
   #     DulyNoted.count("page_views",
   #       for: "home_page",
-  #       time_start: 1.day.ago,
-  #       time_end: Time.now)
+  #       time_start: Time.now,
+  #       time_end: 1.day.ago)
+  #
+  #
+  #     DulyNoted.count("page_views",
+  #        for: "home_page",
+  #        time_range: Time.now..1.day.ago)
   
   def count(metric_name, options={})
     key = normalize(metric_name)
     key << ":#{options[:for]}" if options[:for]
+    if options[:time_range]
+      options[:time_start] = options[:time_range].first
+      options[:time_end] = options[:time_range].last
+    end
     if options[:time_start] && options[:time_end]
       return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
     else 

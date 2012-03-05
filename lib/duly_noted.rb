@@ -169,15 +169,38 @@ module DulyNoted
   
   def count(metric_name, options={})
     key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
+    keys = []
+    if options[:for]
+      key << ":#{options[:for]}"
+    else
+      keys << DulyNoted.redis.keys("#{key}*")
+      keys - DulyNoted.redis.keys("#{key}*:meta")
+      keys - DulyNoted.redis.keys("#{key}:*:")
+      keys.flatten!
+    end
     if options[:time_range]
       options[:time_start] = options[:time_range].first
       options[:time_end] = options[:time_range].last
     end
-    if options[:time_start] && options[:time_end]
-      return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-    else 
-      return DulyNoted.redis.zcard(key)
+    if keys.empty?
+      if options[:time_start] && options[:time_end]
+        return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
+      else 
+        return DulyNoted.redis.zcard(key)
+      end
+    else
+      sum = 0
+      if options[:time_start] && options[:time_end]
+        keys.each do |key|
+          sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
+        end
+        return sum
+      else
+        keys.each do |key|
+          sum += DulyNoted.redis.zcard(key)
+        end
+        return sum
+      end
     end
   end
   

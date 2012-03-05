@@ -1,4 +1,5 @@
 #Duly Noted
+[![Build Status](https://secure.travis-ci.org/willcosgrove/duly_noted.png?branch=master)](http://travis-ci.org/willcosgrove/duly_noted)
 Duly noted is a redis backed stats and metrics tracker.  It works as follows:
 
     DulyNoted.track("page_views", for: "homepage")

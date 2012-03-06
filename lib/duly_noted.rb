@@ -49,6 +49,7 @@ require 'pry'
 # * `count`
 
 module DulyNoted
+  include Helpers
   extend self # the following are class methods
   
   # ##Track
@@ -112,10 +113,16 @@ module DulyNoted
   # `metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
   # 
   # `for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
+  #
+  # `ref_id`: _(optional)_: The reference ID that you set when you called `track` (if you set this, the time restraints is ignored)
+  #
+  # `meta_fields` _(optional)_: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
   # 
   # `time_start`_(optional)_: The start of the time range to grab the data from.
   # 
   # `time_end`_(optional)_: The end of the time range to grab the data from.
+  #
+  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
   # 
   # ###Usage
   # 
@@ -123,17 +130,46 @@ module DulyNoted
   #       for: "home_page",
   #       time_start: 1.day.ago,
   #       time_end: Time.now)
+  #
+  #
+  #     DulyNoted.query("page_views",
+  #       for: "home_page",
+  #       time_range: 1.day.ago..Time.now)
   
   def query(metric_name, options={})
     key = normalize(metric_name)
+    parse_time_range(options)
     key << ":#{options[:for]}" if options[:for]
-    if options[:time_start] && options[:time_end]
-      results = DulyNoted.redis.zrevrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect do |metric|
-        DulyNoted.redis.hgetall metric
+    if options[:ref_id]
+      key << ":#{options[:ref_id]}"
+      real_key = DulyNoted.redis.get key
+      if options[:meta_fields]
+        options[:meta_fields].collect! { |x| x.to_s }
+        result = {}
+        options[:meta_fields].each do |field|
+          result[field] = DulyNoted.redis.hget real_key, field
+        end
+        results = [result]
+      else
+        results = [DulyNoted.redis.hgetall(real_key)]
       end
     else
-      results = DulyNoted.redis.zrevrange(key, 0, -1).collect do |metric|
-        DulyNoted.redis.hgetall metric
+      grab_results = Proc.new do |metric|
+        if options[:meta_fields]
+          options[:meta_fields].collect! { |x| x.to_s }
+          result = {}
+          options[:meta_fields].each do |field|
+            result[field] = DulyNoted.redis.hget metric, field
+          end
+          result
+        else
+          DulyNoted.redis.hgetall metric
+        end
+      end
+      if options[:time_start] && options[:time_end]
+        results = DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+      else
+        results = DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
       end
     end
     return results
@@ -168,6 +204,7 @@ module DulyNoted
   #        time_range: Time.now..1.day.ago)
   
   def count(metric_name, options={})
+    parse_time_range(options)
     key = normalize(metric_name)
     keys = []
     if options[:for]
@@ -177,10 +214,6 @@ module DulyNoted
       keys - DulyNoted.redis.keys("#{key}*:meta")
       keys - DulyNoted.redis.keys("#{key}:*:")
       keys.flatten!
-    end
-    if options[:time_range]
-      options[:time_start] = options[:time_range].first
-      options[:time_end] = options[:time_range].last
     end
     if keys.empty?
       if options[:time_start] && options[:time_end]
@@ -228,10 +261,5 @@ module DulyNoted
       })
     )
   end
-  
-  private
-  
-  def normalize(str)
-    str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
-  end
+
 end

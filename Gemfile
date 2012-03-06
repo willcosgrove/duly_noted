@@ -4,4 +4,6 @@ source 'http://rubygems.org'
 gem 'rake'
 gem 'rb-fsevent'
 gem 'guard-rspec'
+gem 'growl'
+gem 'guard-bundler'
 gemspec

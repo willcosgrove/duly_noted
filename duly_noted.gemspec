@@ -16,6 +16,10 @@ Gem::Specification.new do |gem|
   gem.version       = DulyNoted::VERSION
   gem.add_dependency("redis")
   gem.add_development_dependency("rspec")
-  gem.add_development_dependency("pry")
+  gem.add_development_dependency("rake")
+  gem.add_development_dependency("rb-fsevent")
+  gem.add_development_dependency("guard-rspec")
+  gem.add_development_dependency("growl")
+  gem.add_development_dependency("guard-bundler")
   gem.add_development_dependency("chronic")
 end

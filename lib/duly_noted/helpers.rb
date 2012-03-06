@@ -1,7 +1,10 @@
 module DulyNoted
   module Helpers
-    def normalize(str)
-      str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
+    def normalize(str, validity_test=true)
+      if validity_test
+        raise NotValidMetric if !valid_metric?(str) && !(caller[0] =~ /track/)
+      end
+      return "dn:" + str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
     end
 
     def parse_time_range(options)

@@ -3,6 +3,7 @@ require 'spec_helper'
 describe DulyNoted do
   before :each do
     DulyNoted.redis.flushall
+    Timecop.return
   end
 
   describe "#track" do
@@ -21,6 +22,7 @@ describe DulyNoted do
       DulyNoted.query("page_views").should include({"open" => "true"})
     end
     it "can track past events" do
+      Timecop.freeze
       DulyNoted.track "page_views", :generated_at => Time.now-10
       DulyNoted.count "page_views", :time_range => Time.now-11..Time.now-9
     end
@@ -60,8 +62,8 @@ describe DulyNoted do
       DulyNoted.query("downloads", :ref_id => "unique", :meta_fields => [:browser]).should_not include({"file_name" => "rules.pdf"})
     end
     it "can get only meta hashes from a certain time range" do
-      5.times { DulyNoted.track "page_views", :meta => {:seconds_open => 5, :browser => "chrome"} }
-      sleep 0.5
+      Timecop.freeze
+      5.times { DulyNoted.track "page_views", :meta => {:seconds_open => 5, :browser => "chrome"}, :generated_at => Time.now-1 }
       5.times { DulyNoted.track "page_views", :meta => {:seconds_open => 0, :browser => "firefox"} }
       DulyNoted.query("page_views", :time_start => Time.now-0.5, :time_end => Time.now).should include({"seconds_open" => "0", "browser" => "firefox"})
       DulyNoted.query("page_views", :time_range => Time.now-0.5..Time.now).should include({"seconds_open" => "0", "browser" => "firefox"})
@@ -72,8 +74,7 @@ describe DulyNoted do
 
   describe "#count" do
     it "can count events in between a time range" do
-      5.times { DulyNoted.track "page_views" }
-      sleep 0.2
+      5.times { DulyNoted.track "page_views", :generated_at => Time.now-1 }
       5.times { DulyNoted.track "page_views" }
       DulyNoted.count("page_views", :time_start => Time.now-0.2, :time_end => Time.now).should eq(5)
       DulyNoted.count("page_views", :time_range => Time.now-0.2..Time.now).should eq(5)
@@ -84,13 +85,50 @@ describe DulyNoted do
       DulyNoted.count("page_views").should eq(10)
     end
     it "can count all of one type between a time range" do
-      5.times { DulyNoted.track "page_views", :for => "home" }
-      5.times { DulyNoted.track "page_views", :for => "contact_us" }
-      sleep 0.2
+      5.times { DulyNoted.track "page_views", :for => "home", :generated_at => Time.now-1 }
+      5.times { DulyNoted.track "page_views", :for => "contact_us", :generated_at => Time.now-1 }
       5.times { DulyNoted.track "page_views", :for => "home" }
       5.times { DulyNoted.track "page_views", :for => "contact_us" }
       DulyNoted.count("page_views", :time_start => Time.now-0.2, :time_end => Time.now).should eq(10)
       DulyNoted.count("page_views", :time_range => Time.now-0.2..Time.now).should eq(10)
+    end
+  end
+
+  describe "#chart" do
+    it "should count by a specified time step and store the results in a hash" do
+      # Timecop.freeze
+      5.times { DulyNoted.track "page_views", :generated_at => Time.now-(2.9) }
+      8.times { DulyNoted.track "page_views", :generated_at => Time.now-(1.9) }
+      20.times { DulyNoted.track "page_views", :generated_at => Time.now-(0.9) }
+      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should have_at_least(3).items
+      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should eq({(Time.now-3).to_i => 5, (Time.now-2).to_i => 8, (Time.now-1).to_i => 20})
+    end
+  end
+
+  describe "#metrics" do
+    it "should list all currently tracking metrics" do
+      DulyNoted.track "page_views"
+      DulyNoted.metrics.should include("dn:pageviews")
+    end
+  end
+
+  describe "#valid_metric?" do
+    it "should determine if metric is valid" do
+      DulyNoted.track "page_views"
+      DulyNoted.valid_metric?("page_views").should be_true
+      DulyNoted.valid_metric?("kdfsjhfs").should be_false
+    end
+  end
+
+  describe "#count_x_by_y" do
+    it "should count x by y" do
+      5.times { DulyNoted.track "page_views", :meta => {:browser => "chrome"} }
+      5.times { DulyNoted.track "page_views", :meta => {:browser => "firefox"} }
+      DulyNoted.count_page_views_by_browser.should eq({"chrome" => 5, "firefox" => 5})
+    end
+    it "should raise NotValidMetric if the metric is not valid" do
+      DulyNoted.track "page_views", :meta => {:browser => "chrome"}
+      expect { DulyNoted.count_downloads_by_browser }.to raise_error(DulyNoted::NotValidMetric)
     end
   end
 end

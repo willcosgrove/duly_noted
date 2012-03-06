@@ -56,7 +56,7 @@ require "duly_noted/version"
 module DulyNoted
   include Helpers
   extend self # the following are class methods
-  
+
   # ##Track
   # 
   # _parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional)_
@@ -75,6 +75,7 @@ module DulyNoted
     options = {:generated_at => Time.now}.merge(options)
     key = normalize(metric_name)
     key << ":#{options[:for]}" if options[:for]
+    DulyNoted.redis.sadd normalize("metrics"), normalize(metric_name)
     DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
     DulyNoted.redis.set "#{key}:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
     DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta] if options[:meta] # set meta data
@@ -241,6 +242,42 @@ module DulyNoted
       end
     end
   end
+
+  def chart(metric_name, options={})
+    parse_time_range(options)
+    chart = Hash.new(0)
+    time = options[:time_start]
+    while time <= options[:time_end]
+      chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+options[:granularity], :for => options[:for])
+      time += options[:granularity]
+    end
+    return chart
+  end
+
+  def metrics
+    DulyNoted.redis.smembers normalize("metrics", false)
+  end
+
+  def valid_metric?(metric_name)
+    DulyNoted.redis.sismember normalize("metrics", false), normalize(metric_name, false)
+  end
+
+  def count_x_by_y(metric_name, meta_field)
+    meta_hashes = query(metric_name, :meta_fields => [meta_field])
+    result = Hash.new(0)
+    meta_hashes.each do |meta_hash|
+      result[meta_hash[meta_field]] += 1
+    end
+    result
+  end
+
+  def method_missing(method, *args, &block)
+    if method.to_s =~ /^count_(.+)_by_(.+)$/
+      count_x_by_y($1, $2)
+    else
+      super
+    end
+  end
   
   # ##Redis
   # 
@@ -266,5 +303,5 @@ module DulyNoted
       })
     )
   end
-
+  class NotValidMetric < StandardError; end
 end

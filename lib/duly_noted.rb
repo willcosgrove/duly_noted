@@ -39,7 +39,6 @@ require "redis"
 require "uri"
 require "duly_noted/helpers"
 require "duly_noted/version"
-require 'pry'
 
 # The **DulyNoted** module contains four main methods:
 # 

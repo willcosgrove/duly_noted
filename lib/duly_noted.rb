@@ -31,6 +31,12 @@
 #       time_end: Time.now)
 # 
 # This will return the page view count for the home page for the past day.
+#
+# You can also just specify a `time_range` like so:
+#
+#     DulyNoted.count("page_views",
+#       for: "homepage",
+#       time_range: 1.day.ago..Time.now)
 
 # ##Dependency
 # * Redis

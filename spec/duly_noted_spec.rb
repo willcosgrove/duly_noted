@@ -20,6 +20,10 @@ describe DulyNoted do
       DulyNoted.track "page_views", :meta => {:open => true}
       DulyNoted.query("page_views").should include({"open" => "true"})
     end
+    it "can track past events" do
+      DulyNoted.track "page_views", :generated_at => Time.now-10
+      DulyNoted.count "page_views", :time_range => Time.now-11..Time.now-9
+    end
   end
 
   describe "#update" do

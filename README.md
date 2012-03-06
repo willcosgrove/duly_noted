@@ -21,16 +21,26 @@ To get the count for a particular time range, you can use the `time_start` and `
 
     DulyNoted.count("page_views", for: "homepage", time_start: 1.day.ago, time_end: Time.now)
 
+You can also just specify a `time_range` like so:
+
+    DulyNoted.count("page_views", for: "homepage", time_range: 1.day.ago..Time.now)
+
 This will return the page view count for the home page for the past day.
 
-###### Not nearly ready for public use, in case there were any questions.
+##What's New
+
+### 0.1.0
+
+* Added the `time_range` option to `count`, and `query`
+
+* Added the `meta_fields` option to `query`, which takes an array of fields to pull out from the meta hash
+
+* Added the `ref_id` option to `query`, which takes a reference id and will return an array with one meta hash.  I was going back and forth on whether or not it should wrap the hash in an array.  It doesn't need to be, but I thought, just to make it consistant with it's usual output, I should make it return an array.
+
+* Enough bug fixes to make it production ready! Yay!
+
 
 ##To Do
-* Write tests
-
-* Currently the `:for` key is necessary for most calls, and I'm still in the air on whether it should stay a requirement, or if it should be optional.
-
-  * If it is a requirement, then you could query all page counts easily by not specifying the `:for` key on the count… I'm leaning towards it being a requirement, seems like it would be the case more often than not.
 
 * Count by meta fields: How many page views from each browser?
 

@@ -27,6 +27,18 @@ You can also just specify a `time_range` like so:
 
 This will return the page view count for the home page for the past day.
 
+##Install
+
+You probably already guessed it, but to install just
+
+    gem install duly_noted
+
+or add 
+
+    gem 'duly_noted'
+
+to your `gemfile` and run `bundle install`
+
 ##What's New
 
 ### 0.1.0

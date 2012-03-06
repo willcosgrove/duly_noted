@@ -31,6 +31,12 @@
 #       time_end: Time.now)
 # 
 # This will return the page view count for the home page for the past day.
+#
+# You can also just specify a `time_range` like so:
+#
+#     DulyNoted.count("page_views",
+#       for: "homepage",
+#       time_range: 1.day.ago..Time.now)
 
 # ##Dependency
 # * Redis
@@ -48,6 +54,7 @@ require "duly_noted/version"
 # * `count`
 
 module DulyNoted
+  include Helpers
   extend self # the following are class methods
   
   # ##Track
@@ -65,11 +72,11 @@ module DulyNoted
   # `ref_id`_(optional)_: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric
     
   def track(metric_name, options={})
-    options = {generated_at: Time.now}.merge(options)
+    options = {:generated_at => Time.now}.merge(options)
     key = normalize(metric_name)
     key << ":#{options[:for]}" if options[:for]
     DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
-    DulyNoted.redis.set "#{normalize(metric_name)}:#{options[:for]}:#{options[:ref_id]}", key if options[:ref_id] # set alias key
+    DulyNoted.redis.set "#{key}:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
     DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta] if options[:meta] # set meta data
   end
   
@@ -111,10 +118,16 @@ module DulyNoted
   # `metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
   # 
   # `for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
+  #
+  # `ref_id`: _(optional)_: The reference ID that you set when you called `track` (if you set this, the time restraints is ignored)
+  #
+  # `meta_fields` _(optional)_: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
   # 
   # `time_start`_(optional)_: The start of the time range to grab the data from.
   # 
   # `time_end`_(optional)_: The end of the time range to grab the data from.
+  #
+  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
   # 
   # ###Usage
   # 
@@ -122,17 +135,46 @@ module DulyNoted
   #       for: "home_page",
   #       time_start: 1.day.ago,
   #       time_end: Time.now)
+  #
+  #
+  #     DulyNoted.query("page_views",
+  #       for: "home_page",
+  #       time_range: 1.day.ago..Time.now)
   
   def query(metric_name, options={})
     key = normalize(metric_name)
+    parse_time_range(options)
     key << ":#{options[:for]}" if options[:for]
-    if options[:time_start] && options[:time_end]
-      results = DulyNoted.redis.zrevrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect do |metric|
-        DulyNoted.redis.hgetall metric
+    if options[:ref_id]
+      key << ":#{options[:ref_id]}"
+      real_key = DulyNoted.redis.get key
+      if options[:meta_fields]
+        options[:meta_fields].collect! { |x| x.to_s }
+        result = {}
+        options[:meta_fields].each do |field|
+          result[field] = DulyNoted.redis.hget real_key, field
+        end
+        results = [result]
+      else
+        results = [DulyNoted.redis.hgetall(real_key)]
       end
     else
-      results = DulyNoted.redis.zrevrange(key, 0, -1).collect do |metric|
-        DulyNoted.redis.hgetall metric
+      grab_results = Proc.new do |metric|
+        if options[:meta_fields]
+          options[:meta_fields].collect! { |x| x.to_s }
+          result = {}
+          options[:meta_fields].each do |field|
+            result[field] = DulyNoted.redis.hget metric, field
+          end
+          result
+        else
+          DulyNoted.redis.hgetall metric
+        end
+      end
+      if options[:time_start] && options[:time_end]
+        results = DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+      else
+        results = DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
       end
     end
     return results
@@ -151,21 +193,52 @@ module DulyNoted
   # `time_start`_(optional)_: The start of the time range to grab the data from.
   # 
   # `time_end`_(optional)_: The end of the time range to grab the data from.
+  #
+  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
   # 
   # ###Usage
   # 
   #     DulyNoted.count("page_views",
   #       for: "home_page",
-  #       time_start: 1.day.ago,
-  #       time_end: Time.now)
+  #       time_start: Time.now,
+  #       time_end: 1.day.ago)
+  #
+  #
+  #     DulyNoted.count("page_views",
+  #        for: "home_page",
+  #        time_range: Time.now..1.day.ago)
   
   def count(metric_name, options={})
+    parse_time_range(options)
     key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
-    if options[:time_start] && options[:time_end]
-      return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-    else 
-      return DulyNoted.redis.zcard(key)
+    keys = []
+    if options[:for]
+      key << ":#{options[:for]}"
+    else
+      keys << DulyNoted.redis.keys("#{key}*")
+      keys - DulyNoted.redis.keys("#{key}*:meta")
+      keys - DulyNoted.redis.keys("#{key}:*:")
+      keys.flatten!
+    end
+    if keys.empty?
+      if options[:time_start] && options[:time_end]
+        return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
+      else 
+        return DulyNoted.redis.zcard(key)
+      end
+    else
+      sum = 0
+      if options[:time_start] && options[:time_end]
+        keys.each do |key|
+          sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
+        end
+        return sum
+      else
+        keys.each do |key|
+          sum += DulyNoted.redis.zcard(key)
+        end
+        return sum
+      end
     end
   end
   
@@ -185,7 +258,7 @@ module DulyNoted
     @redis ||= (
       url = URI(@redis_url || "redis://127.0.0.1:6379/0")
 
-      ::Redis.new({
+      Redis.new({
         :host => url.host,
         :port => url.port,
         :db => url.path[1..-1],
@@ -193,10 +266,5 @@ module DulyNoted
       })
     )
   end
-  
-  private
-  
-  def normalize(str)
-    str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
-  end
+
 end

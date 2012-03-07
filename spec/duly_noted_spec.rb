@@ -107,11 +107,11 @@ describe DulyNoted do
   describe "#chart" do
     it "should count by a specified time step and store the results in a hash" do
       # Timecop.freeze
-      5.times { DulyNoted.track "page_views", :generated_at => Time.now-(2.9) }
-      8.times { DulyNoted.track "page_views", :generated_at => Time.now-(1.9) }
-      20.times { DulyNoted.track "page_views", :generated_at => Time.now-(0.9) }
+      1.times { DulyNoted.track "page_views", :generated_at => Time.now-(2.9) }
+      2.times { DulyNoted.track "page_views", :generated_at => Time.now-(1.9) }
+      3.times { DulyNoted.track "page_views", :generated_at => Time.now-(0.9) }
       DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should have_at_least(3).items
-      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should eq({(Time.now-3).to_i => 5, (Time.now-2).to_i => 8, (Time.now-1).to_i => 20})
+      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
     end
     it "will take time_start, step, and data_points options to build a chart" do
       DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")

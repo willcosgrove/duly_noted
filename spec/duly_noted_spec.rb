@@ -17,6 +17,12 @@ describe DulyNoted do
       DulyNoted.count("page_views", :for => "home").should eq(2)
       DulyNoted.count("page_views", :for => "contact_us").should eq(5)
     end
+    it "can nest context" do
+      2.times { DulyNoted.track "views", :for => ["user_123", "video_8172"] }
+      2.times { DulyNoted.track "views", :for => ["user_123", "video_8173"] }
+      DulyNoted.count("views", :for => "user_123").should eq(4)
+      DulyNoted.count("views", :for => ["user_123", "video_8173"]).should eq(2)
+    end
     it "stores metadata" do
       DulyNoted.track "page_views", :meta => {:open => true}
       DulyNoted.query("page_views").should include({"open" => "true"})
@@ -60,6 +66,10 @@ describe DulyNoted do
       DulyNoted.track "downloads", :meta => {:file_name => "rules.pdf", :browser => "chrome"}, :ref_id => "unique"
       DulyNoted.query("downloads", :ref_id => "unique", :meta_fields => [:browser]).should include({"browser" => "chrome"})
       DulyNoted.query("downloads", :ref_id => "unique", :meta_fields => [:browser]).should_not include({"file_name" => "rules.pdf"})
+    end
+    it "can grab only specific fields from a certain context from the hash" do
+      DulyNoted.track "page_views", :for => "home", :meta => {:seconds_open => 0, :browser => "chrome"}
+      DulyNoted.query("page_views", :for => "home", :meta_fields => [:browser]).should include({"browser" => "chrome"})
     end
     it "can get only meta hashes from a certain time range" do
       Timecop.freeze
@@ -108,11 +118,11 @@ describe DulyNoted do
       DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
       DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
     end
-    # it "will take time_end, step, and data_points options to build a chart" do
-    #   DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
-    #   DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
-    #   DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 2am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
-    # end
+    it "will take time_end, step, and data_points options to build a chart" do
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_end => Chronic.parse("yesterday at 2am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+    end
     it "should raise InvalidStep if you give it a step of zero" do
       DulyNoted.track "page_views"
       expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 0, :data_points => 2) }.to raise_error(DulyNoted::InvalidStep)
@@ -140,9 +150,10 @@ describe DulyNoted do
 
   describe "#count_x_by_y" do
     it "should count x by y" do
-      5.times { DulyNoted.track "page_views", :meta => {:browser => "chrome"} }
-      5.times { DulyNoted.track "page_views", :meta => {:browser => "firefox"} }
+      5.times { DulyNoted.track "page_views", :for => "home", :meta => {:browser => "chrome"} }
+      5.times { DulyNoted.track "page_views", :for => "contact_us", :meta => {:browser => "firefox"} }
       DulyNoted.count_page_views_by_browser.should eq({"chrome" => 5, "firefox" => 5})
+      DulyNoted.count_page_views_by_browser(:for => "home").should eq({"chrome" => 5})
     end
     it "should raise NotValidMetric if the metric is not valid" do
       DulyNoted.track "page_views", :meta => {:browser => "chrome"}

@@ -73,12 +73,17 @@ module DulyNoted
     
   def track(metric_name, options={})
     options = {:generated_at => Time.now}.merge(options)
-    key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
-    DulyNoted.redis.sadd normalize("metrics"), normalize(metric_name)
-    DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
-    DulyNoted.redis.set "#{key}:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
-    DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta] if options[:meta] # set meta data
+    key = build_key(metric_name)
+    key << assemble_for(options)
+    DulyNoted.redis.pipelined do
+      DulyNoted.redis.sadd build_key("metrics"), build_key(metric_name)
+      DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
+      DulyNoted.redis.set "#{key}:ref:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
+      if options[:meta] # set meta data
+        DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta]
+        DulyNoted.redis.sadd "#{key}:fields", options[:meta].keys
+      end
+    end
   end
   
   # ##Update
@@ -103,9 +108,9 @@ module DulyNoted
   #       meta: { time_on_page: 30 })
   
   def update(metric_name, ref_id, options={})
-    key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
-    key << ":#{ref_id}"
+    key = build_key(metric_name)
+    key << assemble_for(options)
+    key << ":ref:#{ref_id}"
     real_key = DulyNoted.redis.get key
     DulyNoted.redis.mapped_hmset real_key, options[:meta] if options[:meta] 
   end
@@ -143,11 +148,11 @@ module DulyNoted
   #       time_range: 1.day.ago..Time.now)
   
   def query(metric_name, options={})
-    key = normalize(metric_name)
+    key = build_key(metric_name)
     parse_time_range(options)
-    key << ":#{options[:for]}" if options[:for]
+    key << assemble_for(options)
     if options[:ref_id]
-      key << ":#{options[:ref_id]}"
+      key << ":ref:#{options[:ref_id]}"
       real_key = DulyNoted.redis.get key
       if options[:meta_fields]
         options[:meta_fields].collect! { |x| x.to_s }
@@ -160,6 +165,7 @@ module DulyNoted
         results = [DulyNoted.redis.hgetall(real_key)]
       end
     else
+      keys = find_keys(key)
       grab_results = Proc.new do |metric|
         if options[:meta_fields]
           options[:meta_fields].collect! { |x| x.to_s }
@@ -172,10 +178,15 @@ module DulyNoted
           DulyNoted.redis.hgetall metric
         end
       end
+      results = []
       if options[:time_start] && options[:time_end]
-        results = DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+        keys.each do |key|
+          results += DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+        end
       else
-        results = DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
+        keys.each do |key|
+          results += DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
+        end
       end
     end
     return results
@@ -211,35 +222,20 @@ module DulyNoted
   
   def count(metric_name, options={})
     parse_time_range(options)
-    key = normalize(metric_name)
-    keys = []
-    if options[:for]
-      key << ":#{options[:for]}"
-    else
-      keys << DulyNoted.redis.keys("#{key}*")
-      keys - DulyNoted.redis.keys("#{key}*:meta")
-      keys - DulyNoted.redis.keys("#{key}:*:")
-      keys.flatten!
-    end
-    if keys.empty?
-      if options[:time_start] && options[:time_end]
-        return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-      else 
-        return DulyNoted.redis.zcard(key)
+    key = build_key(metric_name)
+    key << assemble_for(options)
+    keys = find_keys(key)
+    sum = 0
+    if options[:time_start] && options[:time_end]
+      keys.each do |key|
+        sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
       end
+      return sum
     else
-      sum = 0
-      if options[:time_start] && options[:time_end]
-        keys.each do |key|
-          sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-        end
-        return sum
-      else
-        keys.each do |key|
-          sum += DulyNoted.redis.zcard(key)
-        end
-        return sum
+      keys.each do |key|
+        sum += DulyNoted.redis.zcard(key)
       end
+      return sum
     end
   end
 
@@ -252,13 +248,17 @@ module DulyNoted
         chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+options[:granularity], :for => options[:for])
         time += options[:granularity]
       end
-    elsif (options[:time_start] && options[:step] && options[:data_points]) || (options[:time_end] && options[:step] && options[:data_points])
+    elsif  options[:step] && options[:data_points] && (options[:time_end] || options[:time_start])
       raise InvalidStep if options[:step] == 0
       options[:step] *= -1 if (options[:step] > 0 && options[:time_end]) || (options[:step] < 0 && options[:time_start])
       time = options[:time_start] || options[:time_end]
       step = options[:step]
       options[:data_points].times do
-        chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+step, :for => options[:for])
+        options[:time_start] = time
+        options[:time_start] += step if step < 0
+        options[:time_end] = time
+        options[:time_end] += step if step > 0
+        chart[time.to_i] = DulyNoted.count(metric_name, options)
         time += step
       end
     else
@@ -268,15 +268,17 @@ module DulyNoted
   end
 
   def metrics
-    DulyNoted.redis.smembers normalize("metrics", false)
+    DulyNoted.redis.smembers build_key("metrics", false)
   end
 
   def valid_metric?(metric_name)
-    DulyNoted.redis.sismember normalize("metrics", false), normalize(metric_name, false)
+    DulyNoted.redis.sismember build_key("metrics", false), build_key(metric_name, false)
   end
 
-  def count_x_by_y(metric_name, meta_field)
-    meta_hashes = query(metric_name, :meta_fields => [meta_field])
+  def count_x_by_y(metric_name, meta_field, options)
+    options ||= {}
+    options = {:meta_fields => [meta_field]}.merge(options)
+    meta_hashes = query(metric_name, options)
     result = Hash.new(0)
     meta_hashes.each do |meta_hash|
       result[meta_hash[meta_field]] += 1
@@ -286,7 +288,7 @@ module DulyNoted
 
   def method_missing(method, *args, &block)
     if method.to_s =~ /^count_(.+)_by_(.+)$/
-      count_x_by_y($1, $2)
+      count_x_by_y($1, $2, args[0])
     else
       super
     end

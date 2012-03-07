@@ -1,10 +1,34 @@
 module DulyNoted
   module Helpers
-    def normalize(str, validity_test=true)
+    
+    def build_key(str, validity_test=true)
       if validity_test
         raise NotValidMetric if !valid_metric?(str) && !(caller[0] =~ /track/)
       end
-      return "dn:" + str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
+      return "dn:" + normalize(str)
+    end
+
+    def normalize(str)
+      str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
+    end
+
+    def assemble_for(options)
+      case
+      when options[:for].is_a?(String)
+        ":#{normalize(options[:for])}"
+      when options[:for].is_a?(Array)
+        ":" << options[:for].collect{ |x| normalize(x) }.join(":")
+      else
+        ""
+      end
+    end
+
+    def find_keys(key)
+      keys = []
+      keys += DulyNoted.redis.keys("#{key}*")
+      keys -= DulyNoted.redis.keys("#{key}:*:meta")
+      keys -= DulyNoted.redis.keys("#{key}:ref:*")
+      keys -= DulyNoted.redis.keys("#{key}*fields")
     end
 
     def parse_time_range(options)

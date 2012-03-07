@@ -1,58 +1,74 @@
 ##Dependency
 * Redis
 
-The **DulyNoted** module contains four main methods:
+The **DulyNoted** module contains five main methods:
 
 * `track`
 * `update`
 * `query`
 * `count`
+* `chart`
+
+##Parameter Descriptions
+`metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
+
+`for`: A name space for your metric, ex: `home_page`
+*New in v1.0.0*: `for` can be an array of nested contexts.  For example, say you had users, and users had videos, and you wanted to track plays.  Your `for` might look like `["user_1", "video_6"]`.  Now when you're doing `count`s or `quer`ies, you can specify just `for: "user_1"` to get all of the plays for user_1's videos, or you can specify `for: ["user_1", "video_6"]` to get just that video's plays.  It is important to note that `for`s are nested, so you cannot ask for a count `for: "video_6"`, it must always be referenced through `user_1`.
+
+`generated_at`: If the metric was generated in the past but is just now being logged, you can set the time it was generated at
+
+`meta`: A hash with whatever meta data fields you might want to store, ex: `ip_address`, `file_type`
+
+`meta_fields`: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
+
+`ref_id`: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric.  The `ref_id` must be unique across `metric_name`s.
+
+`editable_for`: If you want to clear `ref_id`s out, you can set the metric to only be editable for a certain amount of time.  `editable_for` is defined in seconds.  After that amount of time, you will no longer be able to edit the meta data, and you may use that `ref_id` again.  By default, `ref_id`s never expire.
+
+`time_start`: The start of the time range to grab the data from.  **Important:**  `time_start` should always be the time farthest in the past.
+
+`time_end`: The end of the time range to grab the data from.  **Important:** `time_end` should always be the time closest to the present.
+
+`time_range`: A Range object made up of two Time objects.  The beginning of the Range should be farthest in the past, and the end of the range should be closest to the present.  If `time_range` is defined, `time_end` and `time_start` do not need to be.
+
+
 
 ##Track
 
-_parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional)_
+_parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional), `editable_for`(optional)_
 
-`metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
-
-`for`_(optional)_: A name space for your metric, ex: `home_page`
-
-`generated_at`_(optional)_: If the metric was generated in the past but is just now being logged, you can set the time it was generated at
-
-`meta`_(optional)_: A hash with whatever meta data fields you might want to store, ex: `ip_address`, `file_type`
-
-`ref_id`_(optional)_: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric
-
-##Update
-
-_parameters: `metric_name`, `ref_id`, `for`(required if set when created), `meta`(optional)_
-
-The meta hash will not overwrite the old meta hash but be merged with it, with the new one overwriting conflicts.
-
-`metric_name`: The name of the metric to update, ex: `page_views`, `downloads`
-
-`ref_id`: The reference ID that you set when you called `track`
-
-`for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-
-`meta`_(optional)_: A hash with whatever meta data fields you might want to store, or update ex: `ip_address`, `file_type`, `time_left`
+Use track to track an event, like a page view, or a download.  Use the `for` option to give an event a context.  For instance, for page views, you might set `for` to `home_page`, so that you know which page was viewed.  You can also store metadata along with your metric with the `meta` hash.  If you need to update that `meta` hash at a later time, you can set a `ref_id`, which can be used to tell `#update` exactly which metric you want to update.  `ref_id`s have to be unique across `metric_name`s, and if you want to free up your `ref_id`s, you can set them to expire after a certain number of seconds with `editable_for`.
 
 ###Usage
 
-    DulyNoted.update("page_views", "a_unique_id", for: "home_page", meta: { time_on_page: 30 })
+	DulyNoted.track("page_views", for: "home", meta: {browser: "chrome"})
+	
+	DulyNoted.track("video_plays", for: ["user_7261", "video_917216"], meta: {amount_watched: 0})
+	
+	DulyNoted.track("purchases", for: "user_281", generated_at: 1.day.ago, ref_id: "pid_28172", editable_for: 30)
+
+
+
+##Update
+
+_parameters: `metric_name`, `ref_id`, `meta`(optional), `editable_for`(optional)_
+
+Use update to add, or edit the metadata stored with a metric.  You can optionally set the `editable_for` option which will override any setting set by track.  So if it was set to expire in 30 seconds, and in 20 seconds you called update with `editable_for` set to `30`, it would be editable for 30 seconds from the moment you updated it.
+
+###Usage
+
+	DulyNoted.track("page_views", ref_id: "a_unique_id", meta: {time_on_page: 0, browser: "chrome"})
+	
+    DulyNoted.update("page_views", "a_unique_id", meta: { time_on_page: 30 }, editable_for: 30)
+
+
 
 ##Query
 
-_parameters: `metric_name`, `for`(required if set when created), `time_start`(optional), `time_end`(optional)_
+_parameters: `metric_name`, `for`(optional), `meta_fields`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
 
-Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.
+Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.  If for is specified, it will limit it by that context.  For instance, if you have `track`ed several page views with `for` set to the name of the page that was viewed, you could query with `for` set to `home_page` to get all of the metadata from the page views from the home page, or you could leave off the `for`, and return all of the metadata for all of the page views, across all pages.
 
-`metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
-
-`for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-
-`time_start`_(optional)_: The start of the time range to grab the data from.
-
-`time_end`_(optional)_: The end of the time range to grab the data from.
 
 ###Usage
 
@@ -63,17 +79,9 @@ Query will return an array of all the metadata in chronological order from a tim
 
 ##Count
 
-_parameters: `metric_name`, `for`(required if set when created), `time_start`(optional), `time_end`(optional)_
+_parameters: `metric_name`, `for`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
 
-Count will return the number of events logged in a given time range, or if no time range is given, the total count.
-
-`metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
-
-`for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-
-`time_start`_(optional)_: The start of the time range to grab the data from.
-
-`time_end`_(optional)_: The end of the time range to grab the data from.
+Count will return the number of events logged in a given time range, or if no time range is given, the total count.  As with `#query`, you can specify `for` to return a subset of counts, or you can leave it off to get the count across the whole `metric_name`.
 
 ###Usage
 
@@ -81,6 +89,37 @@ Count will return the number of events logged in a given time range, or if no ti
       for: "home_page",
       time_start: 1.day.ago,
       time_end: Time.now)
+      
+
+##Chart
+
+_parameters: `metric_name`, `data_points`(required),`for`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
+
+Chart is a little complex, but I'll try to explain all of the possibilities.  The smallest amount of input it will take is just a `metric_name` and an amount of `data_points` to capture.  This will check the time of the earliest known data point, and the time of the last known data point, and run chart with those values as the `time_start` and `time_end` respectively.  It will take the amount of time that that spans, and divide it by the number of data points you asked for, and will split the time up evenly, and return a hash of times, and counts.  If you specify both a `time_start` and a `time_end`, and a number of `data_points`, then it will divide the amount of time that that spans and will return a hash of times and counts.  The other option is that you can specify either a `time_start` OR a `time_end` and a `step` and a number of `data_points`.  This will start at whatever time you specified, and (if it's `time_end`) count down by the step (if you specified `time_start`, it would count up), as many times as the number of data points you requested.
+
+###Usage
+
+	
+	
+
+Chart can be a little confusing but it's pretty powerful, so play around with it.
+
+##Magic
+
+###count_x_by_y
+
+If you want to count a number of events by a meta field, you can use this magic command.  So imagine this scenario:
+
+	DulyNoted.track("page_views", meta: {browser: "chrome"})
+	
+And you wanted to see a break down of page views by various browsers, you can call `DulyNoted.count_page_views_by_browser` and you'd get a hash that looked something like this:
+
+	{"chrome" => 2913, "firefox" => 5281, "IE" => 7182, "safari" => 3213}
+
+So that method will work as soon as you've tracked something with that metric name.  If you try to call the method on a metric that you haven't yet tracked you will get a `DulyNoted::NotValidMetric`.  But if you reference a meta field that didn't exist, you'd just get a hash that looks like
+
+	{nil => 1}
+	
 
 ##Redis
 

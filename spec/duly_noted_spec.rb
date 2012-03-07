@@ -32,6 +32,10 @@ describe DulyNoted do
       DulyNoted.track "page_views", :generated_at => Time.now-10
       DulyNoted.count "page_views", :time_range => Time.now-11..Time.now-9
     end
+    it "will allow you to set expirations on `ref_id`s" do
+      DulyNoted.track "page_views", :meta => {:open => true}, :ref_id => "unique", :editable_for => 0
+      expect { DulyNoted.update("page_views", "unique") }.to raise_error(DulyNoted::InvalidRefId)
+    end
   end
 
   describe "#update" do
@@ -45,6 +49,11 @@ describe DulyNoted do
       DulyNoted.track "page_views", :meta => {:seconds_open => 0}, :ref_id => "unique"
       DulyNoted.update "page_views", "unique", :meta => {:ip_address => "19.27.182.32"}
       DulyNoted.query("page_views").should include({"seconds_open" => "0", "ip_address" => "19.27.182.32"})
+    end
+    it "does not require that `for:` be set to update" do
+      DulyNoted.track "page_views", :for => "home", :meta => {:seconds_open => 0}, :ref_id => "unique"
+      DulyNoted.update "page_views", "unique", :meta => {:seconds_open => 5}
+      DulyNoted.query("page_views").should include({"seconds_open" => "5"})
     end
   end
 
@@ -110,8 +119,13 @@ describe DulyNoted do
       1.times { DulyNoted.track "page_views", :generated_at => Time.now-(2.9) }
       2.times { DulyNoted.track "page_views", :generated_at => Time.now-(1.9) }
       3.times { DulyNoted.track "page_views", :generated_at => Time.now-(0.9) }
-      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should have_at_least(3).items
-      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
+      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :step => (1)}).should have_at_least(3).items
+      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :step => (1)}).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
+    end
+    it "can count events between a time range, without a step set" do
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_range => Chronic.parse("yesterday at 12am")...Chronic.parse("yesterday at 2am"), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
     end
     it "will take time_start, step, and data_points options to build a chart" do
       DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
@@ -131,6 +145,11 @@ describe DulyNoted do
       DulyNoted.track "page_views"
       expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 60*60) }.to raise_error(DulyNoted::InvalidOptions)
     end
+    it "should chart everything if no time range is specified" do
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :data_points => 2).should eq({Chronic.parse("yesterday at 12:30am").to_i => 1, Chronic.parse("yesterday at 12:55am").to_i => 1})
+    end
   end
 
   describe "#metrics" do
@@ -145,6 +164,13 @@ describe DulyNoted do
       DulyNoted.track "page_views"
       DulyNoted.valid_metric?("page_views").should be_true
       DulyNoted.valid_metric?("kdfsjhfs").should be_false
+    end
+  end
+
+  describe "#fields_for" do
+    it "should list the stored meta fields for a given metric" do
+      DulyNoted.track "page_views", :for => "home", :meta => {:seconds_open => 5, :browser => "chrome"}
+      DulyNoted.fields_for("page_views").should include("seconds_open", "browser")
     end
   end
 

@@ -103,6 +103,24 @@ describe DulyNoted do
       DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should have_at_least(3).items
       DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :granularity => (1)}).should eq({(Time.now-3).to_i => 5, (Time.now-2).to_i => 8, (Time.now-1).to_i => 20})
     end
+    it "will take time_start, step, and data_points options to build a chart" do
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+    end
+    # it "will take time_end, step, and data_points options to build a chart" do
+    #   DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+    #   DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+    #   DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 2am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+    # end
+    it "should raise InvalidStep if you give it a step of zero" do
+      DulyNoted.track "page_views"
+      expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 0, :data_points => 2) }.to raise_error(DulyNoted::InvalidStep)
+    end
+    it "should raise InvalidOptions if you give it invalid options" do
+      DulyNoted.track "page_views"
+      expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 60*60) }.to raise_error(DulyNoted::InvalidOptions)
+    end
   end
 
   describe "#metrics" do

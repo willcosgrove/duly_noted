@@ -246,10 +246,23 @@ module DulyNoted
   def chart(metric_name, options={})
     parse_time_range(options)
     chart = Hash.new(0)
-    time = options[:time_start]
-    while time <= options[:time_end]
-      chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+options[:granularity], :for => options[:for])
-      time += options[:granularity]
+    if options[:time_start] && options[:time_end]
+      time = options[:time_start]
+      while time <= options[:time_end]
+        chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+options[:granularity], :for => options[:for])
+        time += options[:granularity]
+      end
+    elsif (options[:time_start] && options[:step] && options[:data_points]) || (options[:time_end] && options[:step] && options[:data_points])
+      raise InvalidStep if options[:step] == 0
+      options[:step] *= -1 if (options[:step] > 0 && options[:time_end]) || (options[:step] < 0 && options[:time_start])
+      time = options[:time_start] || options[:time_end]
+      step = options[:step]
+      options[:data_points].times do
+        chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+step, :for => options[:for])
+        time += step
+      end
+    else
+      raise InvalidOptions
     end
     return chart
   end
@@ -304,4 +317,6 @@ module DulyNoted
     )
   end
   class NotValidMetric < StandardError; end
+  class InvalidOptions < StandardError; end
+  class InvalidStep < StandardError; end
 end

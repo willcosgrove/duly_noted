@@ -1,3 +1,5 @@
+# _Updated for v1.0.0_
+#
 # Duly noted is a redis backed stats and metrics tracker.  It works as follows:
 # 
 #     DulyNoted.track("page_views",
@@ -45,89 +47,120 @@ require "redis"
 require "uri"
 require "duly_noted/helpers"
 require "duly_noted/version"
+require "duly_noted/updater"
 
-# The **DulyNoted** module contains four main methods:
-# 
+# The **DulyNoted** module contains five main methods:
+
 # * `track`
 # * `update`
 # * `query`
 # * `count`
+# * `chart`
 
 module DulyNoted
   include Helpers
+  include Updater
   extend self # the following are class methods
-  
+
+# ##Parameter Descriptions
+# `metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
+# 
+# `for`: A name space for your metric, ex: `home_page`
+# *New in v1.0.0*: `for` can be an array of nested contexts.  For example, say you had users, and users had videos, and you wanted to track plays.  Your `for` might look like `["user_1", "video_6"]`.  Now when you're doing `count`s or `quer`ies, you can specify just `for: "user_1"` to get all of the plays for user_1's videos, or you can specify `for: ["user_1", "video_6"]` to get just that video's plays.  It is important to note that `for`s are nested, so you cannot ask for a count `for: "video_6"`, it must always be referenced through `user_1`.
+# 
+# `generated_at`: If the metric was generated in the past but is just now being logged, you can set the time it was generated at
+# 
+# `meta`: A hash with whatever meta data fields you might want to store, ex: `ip_address`, `file_type`
+# 
+# `meta_fields`: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
+# 
+# `ref_id`: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric.  The `ref_id` must be unique across `metric_name`s.
+# 
+# `editable_for`: If you want to clear `ref_id`s out, you can set the metric to only be editable for a certain amount of time.  `editable_for` is defined in seconds.  After that amount of time, you will no longer be able to edit the meta data, and you may use that `ref_id` again.  By default, `ref_id`s never expire.
+# 
+# `time_start`: The start of the time range to grab the data from.  **Important:**  `time_start` should always be the time farthest in the past.
+# 
+# `time_end`: The end of the time range to grab the data from.  **Important:** `time_end` should always be the time closest to the present.
+# 
+# `time_range`: A Range object made up of two Time objects.  The beginning of the Range should be farthest in the past, and the end of the range should be closest to the present.  If `time_range` is defined, `time_end` and `time_start` do not need to be.
+
   # ##Track
   # 
-  # _parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional)_
+  # _parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional), `editable_for`(optional)_
   # 
-  # `metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
+  # Use track to track an event, like a page view, or a download.  Use the `for` option
+  # to give an event a context.  For instance, for page views, you might set `for` to
+  # `home_page`, so that you know which page was viewed.  You can also store metadata
+  # along with your metric with the `meta` hash.  If you need to update that `meta` hash
+  # at a later time, you can set a `ref_id`, which can be used to tell `#update`
+  # exactly which metric you want to update.  `ref_id`s have to be unique across
+  # `metric_name`s, and if you want to free up your `ref_id`s, you can set them to expire
+  # after a certain number of seconds with `editable_for`.
   # 
-  # `for`_(optional)_: A name space for your metric, ex: `home_page`
+  # ###Usage
   # 
-  # `generated_at`_(optional)_: If the metric was generated in the past but is just now being logged, you can set the time it was generated at
+  #     DulyNoted.track("page_views",
+  #       for: "home",
+  #       meta: {browser: "chrome"})
   # 
-  # `meta`_(optional)_: A hash with whatever meta data fields you might want to store, ex: `ip_address`, `file_type`
+  #     DulyNoted.track("video_plays",
+  #       for: ["user_7261", "video_917216"],
+  #       meta: {amount_watched: 0})
   # 
-  # `ref_id`_(optional)_: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric
+  #     DulyNoted.track("purchases",
+  #       for: "user_281",
+  #       generated_at: 1.day.ago,
+  #       ref_id: "pid_28172",
+  #       editable_for: 30)
     
   def track(metric_name, options={})
     options = {:generated_at => Time.now}.merge(options)
-    key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
-    DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
-    DulyNoted.redis.set "#{key}:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
-    DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta] if options[:meta] # set meta data
+    key = build_key(metric_name)
+    key << assemble_for(options)
+    DulyNoted.redis.pipelined do
+      DulyNoted.redis.sadd build_key("metrics"), build_key(metric_name)
+      DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
+      DulyNoted.redis.set "#{build_key(metric_name)}:ref:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
+      DulyNoted.redis.expire "#{build_key(metric_name)}:ref:#{options[:ref_id]}", options[:editable_for] if options[:editable_for]
+      if options[:meta] # set meta data
+        DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta]
+        options[:meta].keys.each do |field|
+          DulyNoted.redis.sadd "#{key}:fields", field
+        end
+      end
+    end
   end
   
   # ##Update
   # 
-  # _parameters: `metric_name`, `ref_id`, `for`(required if set when created), `meta`(optional)_
+  # _parameters: `metric_name`, `ref_id`, `meta`(optional), `editable_for`(optional)_
   # 
-  # The meta hash will not overwrite the old meta hash but be merged with it, with the new one overwriting conflicts.
-  # 
-  # `metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
-  # 
-  # `ref_id`: The reference ID that you set when you called `track`
-  # 
-  # `for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-  # 
-  # `meta`_(optional)_: A hash with whatever meta data fields you might want to store, or update ex: `ip_address`, `file_type`, `time_left`
+  # Use update to add, or edit the metadata stored with a metric.  You can optionally set the `editable_for` option which will override any setting set by track.  So if it was set to expire in 30 seconds, and in 20 seconds you called update with `editable_for` set to `30`, it would be editable for 30 seconds from the moment you updated it.
   # 
   # ###Usage
   # 
+  #     DulyNoted.track("page_views",
+  #       ref_id: "a_unique_id",
+  #       meta: {time_on_page: 0, browser: "chrome"})
   #     DulyNoted.update("page_views",
   #       "a_unique_id",
-  #       for: "home_page",
-  #       meta: { time_on_page: 30 })
+  #       meta: { time_on_page: 30 },
+  #       editable_for: 30)
   
   def update(metric_name, ref_id, options={})
-    key = normalize(metric_name)
-    key << ":#{options[:for]}" if options[:for]
-    key << ":#{ref_id}"
+    key = build_key(metric_name)
+    key << ":ref:#{ref_id}"
     real_key = DulyNoted.redis.get key
+    raise InvalidRefId if real_key == nil
     DulyNoted.redis.mapped_hmset real_key, options[:meta] if options[:meta] 
   end
   
   # ##Query
   # 
-  # _parameters: `metric_name`, `for`(required if set when created), `time_start`(optional), `time_end`(optional)_
+  # _parameters: `metric_name`, `for`(optional), `meta_fields`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
   # 
-  # Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.
+  # Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.  If for is specified, it will limit it by that context.  For instance, if you have `track`ed several page views with `for` set to the name of the page that was viewed, you could query with `for` set to `home_page` to get all of the metadata from the page views from the home page, or you could leave off the `for`, and return all of the metadata for all of the page views, across all pages.
   # 
-  # `metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
-  # 
-  # `for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-  #
-  # `ref_id`: _(optional)_: The reference ID that you set when you called `track` (if you set this, the time restraints is ignored)
-  #
-  # `meta_fields` _(optional)_: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
-  # 
-  # `time_start`_(optional)_: The start of the time range to grab the data from.
-  # 
-  # `time_end`_(optional)_: The end of the time range to grab the data from.
-  #
-  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
   # 
   # ###Usage
   # 
@@ -135,18 +168,13 @@ module DulyNoted
   #       for: "home_page",
   #       time_start: 1.day.ago,
   #       time_end: Time.now)
-  #
-  #
-  #     DulyNoted.query("page_views",
-  #       for: "home_page",
-  #       time_range: 1.day.ago..Time.now)
   
   def query(metric_name, options={})
-    key = normalize(metric_name)
+    key = build_key(metric_name)
     parse_time_range(options)
-    key << ":#{options[:for]}" if options[:for]
+    key << assemble_for(options)
     if options[:ref_id]
-      key << ":#{options[:ref_id]}"
+      key << ":ref:#{options[:ref_id]}"
       real_key = DulyNoted.redis.get key
       if options[:meta_fields]
         options[:meta_fields].collect! { |x| x.to_s }
@@ -159,6 +187,7 @@ module DulyNoted
         results = [DulyNoted.redis.hgetall(real_key)]
       end
     else
+      keys = find_keys(key)
       grab_results = Proc.new do |metric|
         if options[:meta_fields]
           options[:meta_fields].collect! { |x| x.to_s }
@@ -171,10 +200,15 @@ module DulyNoted
           DulyNoted.redis.hgetall metric
         end
       end
+      results = []
       if options[:time_start] && options[:time_end]
-        results = DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+        keys.each do |key|
+          results += DulyNoted.redis.zrangebyscore(key, options[:time_start].to_f, options[:time_end].to_f).collect(&grab_results)
+        end
       else
-        results = DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
+        keys.each do |key|
+          results += DulyNoted.redis.zrange(key, 0, -1).collect(&grab_results)
+        end
       end
     end
     return results
@@ -182,63 +216,144 @@ module DulyNoted
   
   # ##Count
   # 
-  # _parameters: `metric_name`, `for`(required if set when created), `time_start`(optional), `time_end`(optional)_
+  # _parameters: `metric_name`, `for`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
   # 
-  # Count will return the number of events logged in a given time range, or if no time range is given, the total count.
-  # 
-  # `metric_name`: The name of the metric to query, ex: `page_views`, `downloads`
-  # 
-  # `for`_(required if you set `for` when you generated the metric)_: A name space for your metric, ex: `home_page`
-  # 
-  # `time_start`_(optional)_: The start of the time range to grab the data from.
-  # 
-  # `time_end`_(optional)_: The end of the time range to grab the data from.
-  #
-  # `time_range _(optional)_: Alternatively you can specify a time range, instead of `time_start` and `time_end`.
+  # Count will return the number of events logged in a given time range, or if no time range is given, the total count.  As with `#query`, you can specify `for` to return a subset of counts, or you can leave it off to get the count across the whole `metric_name`.
   # 
   # ###Usage
   # 
   #     DulyNoted.count("page_views",
   #       for: "home_page",
-  #       time_start: Time.now,
-  #       time_end: 1.day.ago)
-  #
-  #
-  #     DulyNoted.count("page_views",
-  #        for: "home_page",
-  #        time_range: Time.now..1.day.ago)
+  #       time_start: 1.day.ago,
+  #       time_end: Time.now)
   
   def count(metric_name, options={})
     parse_time_range(options)
-    key = normalize(metric_name)
-    keys = []
-    if options[:for]
-      key << ":#{options[:for]}"
+    key = build_key(metric_name)
+    key << assemble_for(options)
+    keys = find_keys(key)
+    sum = 0
+    if options[:time_start] && options[:time_end]
+      keys.each do |key|
+        sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
+      end
+      return sum
     else
-      keys << DulyNoted.redis.keys("#{key}*")
-      keys - DulyNoted.redis.keys("#{key}*:meta")
-      keys - DulyNoted.redis.keys("#{key}:*:")
-      keys.flatten!
+      keys.each do |key|
+        sum += DulyNoted.redis.zcard(key)
+      end
+      return sum
     end
-    if keys.empty?
-      if options[:time_start] && options[:time_end]
-        return DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-      else 
-        return DulyNoted.redis.zcard(key)
+  end
+
+  # ##Chart
+  # 
+  # _parameters: `metric_name`, `data_points`(required),`for`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
+  # 
+  # Chart is a little complex, but I'll try to explain all of the possibilities.  It's main purpose is to pull out your data and prepare it in a way that makes it easy to chart.  The smallest amount of input it will take is just a `metric_name` and an amount of `data_points` to capture.  This will check the time of the earliest known data point, and the time of the last known data point, and run chart with those values as the `time_start` and `time_end` respectively.  It will take the amount of time that that spans, and divide it by the number of data points you asked for, and will split the time up evenly, and return a hash of times, and counts.  If you specify both a `time_start` and a `time_end`, and a number of `data_points`, then it will divide the amount of time that that spans and will return a hash of times and counts.  The other option is that you can specify either a `time_start` OR a `time_end` and a `step` and a number of `data_points`.  This will start at whatever time you specified, and (if it's `time_end`) count down by the step (if you specified `time_start`, it would count up), as many times as the number of data points you requested.
+  # 
+  # ###Usage
+  # 
+  #     DulyNoted.chart("page_views",
+  #       :time_range => 1.month.ago..Time.now,
+  #       :step => 1.day)
+  # 
+  #     DulyNoted.chart("page_views",
+  #       :time_range => 1.day.ago..Time.now,
+  #       :data_points => 12)
+  # 
+  #     DulyNoted.chart("page_views",
+  #       :time_start => 1.day.ago,
+  #       :step => 1.hour,
+  #       :data_points => 12)
+  # 
+  #     DulyNoted.chart("downloads",
+  #       :time_end => Time.now,
+  #       :step => 1.month,
+  #       :data_points => 12)
+  # 
+  #     DulyNoted.chart("page_views",
+  #       :data_points => 100)
+  # 
+  # 
+  # Chart can be a little confusing but it's pretty powerful, so play around with it.
+
+  def chart(metric_name, options={})
+    parse_time_range(options)
+    chart = Hash.new(0)
+    if options[:time_start] && options[:time_end]
+      time = options[:time_start]
+      if options[:data_points]
+        total_time = options[:time_end] - options[:time_start]
+        options[:step] = total_time.to_i / options[:data_points]
       end
+      while time < options[:time_end]
+        chart[time.to_i] = DulyNoted.count(metric_name, :time_start => time, :time_end => time+options[:step], :for => options[:for])
+        time += options[:step]
+      end
+    elsif options[:step] && options[:data_points] && (options[:time_end] || options[:time_start])
+      raise InvalidStep if options[:step] == 0
+      options[:step] *= -1 if (options[:step] > 0 && options[:time_end]) || (options[:step] < 0 && options[:time_start])
+      time = options[:time_start] || options[:time_end]
+      step = options[:step]
+      options[:data_points].times do
+        options[:time_start] = time
+        options[:time_start] += step if step < 0
+        options[:time_end] = time
+        options[:time_end] += step if step > 0
+        chart[time.to_i] = DulyNoted.count(metric_name, options)
+        time += step
+      end
+    elsif options[:data_points]
+      key = build_key(metric_name)
+      key << assemble_for(options)
+      options[:time_start] = Time.at(DulyNoted.redis.zrange(key, 0, 0, :withscores => true)[1].to_f)
+      options[:time_end] = Time.at(DulyNoted.redis.zrevrange(key, 0, 0, :withscores => true)[1].to_f)
+      chart = DulyNoted.chart(metric_name, options)
     else
-      sum = 0
-      if options[:time_start] && options[:time_end]
-        keys.each do |key|
-          sum += DulyNoted.redis.zcount(key, options[:time_start].to_f, options[:time_end].to_f)
-        end
-        return sum
-      else
-        keys.each do |key|
-          sum += DulyNoted.redis.zcard(key)
-        end
-        return sum
-      end
+      raise InvalidOptions
+    end
+    return chart
+  end
+
+  # ##Magic
+  # 
+  # ###count\_x\_by\_y
+  # 
+  # If you want to count a number of events by a meta field, you can use this magic command.  So imagine this scenario:
+  # 
+  #     DulyNoted.track("page_views", meta: {browser: "chrome"})
+  # 
+  # And you wanted to see a break down of page views by various browsers, you can call `DulyNoted.count_page_views_by_browser` and you'd get a hash that looked something like this:
+  # 
+  #     {"chrome" => 2913, "firefox" => 5281, "IE" => 7182, "safari" => 3213}
+  # 
+  # So that method will work as soon as you've tracked something with that metric name.  If you try to call the method on a metric that you haven't yet tracked you will get a `DulyNoted::NotValidMetric`.  But if you reference a meta field that didn't exist, you'd just get a hash that looks like
+  # 
+  #     {nil => 1}
+
+  def count_x_by_y(metric_name, meta_field, options)
+    options ||= {}
+    options = {:meta_fields => [meta_field]}.merge(options)
+    meta_hashes = query(metric_name, options)
+    result = Hash.new(0)
+    meta_hashes.each do |meta_hash|
+      result[meta_hash[meta_field]] += 1
+    end
+    result
+  end
+
+  # ##Behind the curtain (metaprogramming)
+  # 
+  # ###method_missing
+  # 
+  # As I'm sure you're aware, method_missing is the magic tool for ruby developers to define dynamic methods like the above `count_x_by_y`, which is exactly what we use it for.
+
+  def method_missing(method, *args, &block)
+    if method.to_s =~ /^count_(.+)_by_(.+)$/
+      count_x_by_y($1, $2, args[0])
+    else
+      super
     end
   end
   
@@ -258,13 +373,17 @@ module DulyNoted
     @redis ||= (
       url = URI(@redis_url || "redis://127.0.0.1:6379/0")
 
-      Redis.new({
+      check_schema(Redis.new({
         :host => url.host,
         :port => url.port,
         :db => url.path[1..-1],
         :password => url.password
-      })
+      }))
     )
   end
-
+  class NotValidMetric < StandardError; end
+  class InvalidOptions < StandardError; end
+  class InvalidStep < StandardError; end
+  class InvalidRefId < StandardError; end
+  class UpdateError < StandardError; end
 end

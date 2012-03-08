@@ -21,7 +21,9 @@
         <div class="pilwrap">
           <a class="pilcrow" href="#section-1">&#182;</a>
         </div>
-        <p>Duly noted is a redis backed stats and metrics tracker.  It works as follows:</p>
+        <p><em>Updated for v1.0.0</em></p>
+
+<p>Duly noted is a redis backed stats and metrics tracker.  It works as follows:</p>
 
 <pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
   for: &ldquo;home_page&rdquo;)
@@ -86,7 +88,8 @@
         <div class='highlight'><pre><span class="nb">require</span> <span class="s2">&quot;redis&quot;</span>
 <span class="nb">require</span> <span class="s2">&quot;uri&quot;</span>
 <span class="nb">require</span> <span class="s2">&quot;duly_noted/helpers&quot;</span>
-<span class="nb">require</span> <span class="s2">&quot;duly_noted/version&quot;</span></pre></div>
+<span class="nb">require</span> <span class="s2">&quot;duly_noted/version&quot;</span>
+<span class="nb">require</span> <span class="s2">&quot;duly_noted/updater&quot;</span></pre></div>
       </td>
     </tr>
     <tr id='section-3'>
@@ -94,20 +97,62 @@
         <div class="pilwrap">
           <a class="pilcrow" href="#section-3">&#182;</a>
         </div>
-        <p>The <strong>DulyNoted</strong> module contains four main methods:</p>
-
-<ul>
+        <p>The <strong>DulyNoted</strong> module contains five main methods:</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
+      </td>
+    </tr>
+    <tr id='section-4'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-4">&#182;</a>
+        </div>
+        <ul>
 <li><code>track</code></li>
 <li><code>update</code></li>
 <li><code>query</code></li>
 <li><code>count</code></li>
+<li><code>chart</code></li>
 </ul>
       </td>
       <td class=code>
         <div class='highlight'><pre><span class="k">module</span> <span class="nn">DulyNoted</span>
   <span class="kp">include</span> <span class="no">Helpers</span>
-  <span class="kp">extend</span> <span class="nb">self</span> <span class="c1"># the following are class methods</span>
-  </pre></div>
+  <span class="kp">include</span> <span class="no">Updater</span>
+  <span class="kp">extend</span> <span class="nb">self</span> <span class="c1"># the following are class methods</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Parameter_Descriptions'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Parameter_Descriptions">&#182;</a>
+        </div>
+        <h2>Parameter Descriptions</h2>
+
+<p><code>metric_name</code>: The name of the metric to track, ex: <code>page_views</code>, <code>downloads</code></p>
+
+<p><code>for</code>: A name space for your metric, ex: <code>home_page</code>
+<em>New in v1.0.0</em>: <code>for</code> can be an array of nested contexts.  For example, say you had users, and users had videos, and you wanted to track plays.  Your <code>for</code> might look like <code>[&ldquo;user_1&rdquo;, &ldquo;video_6&rdquo;]</code>.  Now when you&rsquo;re doing <code>count</code>s or <code>quer</code>ies, you can specify just <code>for: &ldquo;user_1&rdquo;</code> to get all of the plays for user_1&rsquo;s videos, or you can specify <code>for: [&ldquo;user_1&rdquo;, &ldquo;video_6&rdquo;]</code> to get just that video&rsquo;s plays.  It is important to note that <code>for</code>s are nested, so you cannot ask for a count <code>for: &ldquo;video_6&rdquo;</code>, it must always be referenced through <code>user_1</code>.</p>
+
+<p><code>generated_at</code>: If the metric was generated in the past but is just now being logged, you can set the time it was generated at</p>
+
+<p><code>meta</code>: A hash with whatever meta data fields you might want to store, ex: <code>ip_address</code>, <code>file_type</code></p>
+
+<p><code>meta_fields</code>: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.</p>
+
+<p><code>ref_id</code>: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric.  The <code>ref_id</code> must be unique across <code>metric_name</code>s.</p>
+
+<p><code>editable_for</code>: If you want to clear <code>ref_id</code>s out, you can set the metric to only be editable for a certain amount of time.  <code>editable_for</code> is defined in seconds.  After that amount of time, you will no longer be able to edit the meta data, and you may use that <code>ref_id</code> again.  By default, <code>ref_id</code>s never expire.</p>
+
+<p><code>time_start</code>: The start of the time range to grab the data from.  <strong>Important:</strong>  <code>time_start</code> should always be the time farthest in the past.</p>
+
+<p><code>time_end</code>: The end of the time range to grab the data from.  <strong>Important:</strong> <code>time_end</code> should always be the time closest to the present.</p>
+
+<p><code>time_range</code>: A Range object made up of two Time objects.  The beginning of the Range should be farthest in the past, and the end of the range should be closest to the present.  If <code>time_range</code> is defined, <code>time_end</code> and <code>time_start</code> do not need to be.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre></pre></div>
       </td>
     </tr>
     <tr id='section-Track'>
@@ -117,27 +162,52 @@
         </div>
         <h2>Track</h2>
 
-<p><em>parameters: <code>metric_name</code>, <code>for</code>(optional), <code>generated_at</code>(optional), <code>meta</code>(optional), <code>ref_id</code>(optional)</em></p>
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(optional), <code>generated_at</code>(optional), <code>meta</code>(optional), <code>ref_id</code>(optional), <code>editable_for</code>(optional)</em></p>
 
-<p><code>metric_name</code>: The name of the metric to track, ex: <code>page_views</code>, <code>downloads</code></p>
+<p>Use track to track an event, like a page view, or a download.  Use the <code>for</code> option
+to give an event a context.  For instance, for page views, you might set <code>for</code> to
+<code>home_page</code>, so that you know which page was viewed.  You can also store metadata
+along with your metric with the <code>meta</code> hash.  If you need to update that <code>meta</code> hash
+at a later time, you can set a <code>ref_id</code>, which can be used to tell <code>#update</code>
+exactly which metric you want to update.  <code>ref_id</code>s have to be unique across
+<code>metric_name</code>s, and if you want to free up your <code>ref_id</code>s, you can set them to expire
+after a certain number of seconds with <code>editable_for</code>.</p>
 
-<p><code>for</code><em>(optional)</em>: A name space for your metric, ex: <code>home_page</code></p>
+<h3>Usage</h3>
 
-<p><code>generated_at</code><em>(optional)</em>: If the metric was generated in the past but is just now being logged, you can set the time it was generated at</p>
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
+  for: &ldquo;home&rdquo;,
+  meta: {browser: &ldquo;chrome&rdquo;})
 
-<p><code>meta</code><em>(optional)</em>: A hash with whatever meta data fields you might want to store, ex: <code>ip_address</code>, <code>file_type</code></p>
+DulyNoted.track(&ldquo;video_plays&rdquo;,
+  for: [&ldquo;user_7261&rdquo;, &ldquo;video_917216&rdquo;],
+  meta: {amount_watched: 0})
 
-<p><code>ref_id</code><em>(optional)</em>: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric</p>
+DulyNoted.track(&ldquo;purchases&rdquo;,
+  for: &ldquo;user_281&rdquo;,
+  generated_at: 1.day.ago,
+  ref_id: &ldquo;pid_28172&rdquo;,
+  editable_for: 30)
+</code></pre>
       </td>
       <td class=code>
         <div class='highlight'><pre>    
   <span class="k">def</span> <span class="nf">track</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
     <span class="n">options</span> <span class="o">=</span> <span class="p">{</span><span class="ss">:generated_at</span> <span class="o">=&gt;</span> <span class="no">Time</span><span class="o">.</span><span class="n">now</span><span class="p">}</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
-    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
-    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
-    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zadd</span> <span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span>
-    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">set</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span> <span class="c1"># set alias key</span>
-    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">mapped_hmset</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="c1"># set meta data</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="n">assemble_for</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+    <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">pipelined</span> <span class="k">do</span>
+      <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">sadd</span> <span class="n">build_key</span><span class="p">(</span><span class="s2">&quot;metrics&quot;</span><span class="p">),</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+      <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zadd</span> <span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span>
+      <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">set</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span><span class="si">}</span><span class="s2">:ref:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span> <span class="c1"># set alias key</span>
+      <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">expire</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span><span class="si">}</span><span class="s2">:ref:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:editable_for</span><span class="o">]</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:editable_for</span><span class="o">]</span>
+      <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="c1"># set meta data</span>
+        <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">mapped_hmset</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:generated_at</span><span class="o">].</span><span class="n">to_f</span><span class="si">}</span><span class="s2">:meta&quot;</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">].</span><span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">field</span><span class="o">|</span>
+          <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">sadd</span> <span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:fields&quot;</span><span class="p">,</span> <span class="n">field</span>
+        <span class="k">end</span>
+      <span class="k">end</span>
+    <span class="k">end</span>
   <span class="k">end</span>
   </pre></div>
       </td>
@@ -149,33 +219,28 @@
         </div>
         <h2>Update</h2>
 
-<p><em>parameters: <code>metric_name</code>, <code>ref_id</code>, <code>for</code>(required if set when created), <code>meta</code>(optional)</em></p>
+<p><em>parameters: <code>metric_name</code>, <code>ref_id</code>, <code>meta</code>(optional), <code>editable_for</code>(optional)</em></p>
 
-<p>The meta hash will not overwrite the old meta hash but be merged with it, with the new one overwriting conflicts.</p>
-
-<p><code>metric_name</code>: The name of the metric to track, ex: <code>page_views</code>, <code>downloads</code></p>
-
-<p><code>ref_id</code>: The reference ID that you set when you called <code>track</code></p>
-
-<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
-
-<p><code>meta</code><em>(optional)</em>: A hash with whatever meta data fields you might want to store, or update ex: <code>ip_address</code>, <code>file_type</code>, <code>time_left</code></p>
+<p>Use update to add, or edit the metadata stored with a metric.  You can optionally set the <code>editable_for</code> option which will override any setting set by track.  So if it was set to expire in 30 seconds, and in 20 seconds you called update with <code>editable_for</code> set to <code>30</code>, it would be editable for 30 seconds from the moment you updated it.</p>
 
 <h3>Usage</h3>
 
-<pre><code>DulyNoted.update(&ldquo;page_views&rdquo;,
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;,
+  ref_id: &ldquo;a_unique_id&rdquo;,
+  meta: {time_on_page: 0, browser: &ldquo;chrome&rdquo;})
+DulyNoted.update(&ldquo;page_views&rdquo;,
   &ldquo;a_unique_id&rdquo;,
-  for: &ldquo;home_page&rdquo;,
-  meta: { time_on_page: 30 })
+  meta: { time_on_page: 30 },
+  editable_for: 30)
 </code></pre>
       </td>
       <td class=code>
         <div class='highlight'><pre>  
   <span class="k">def</span> <span class="nf">update</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">ref_id</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
-    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
-    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
-    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:ref:</span><span class="si">#{</span><span class="n">ref_id</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="n">real_key</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">get</span> <span class="n">key</span>
+    <span class="k">raise</span> <span class="no">InvalidRefId</span> <span class="k">if</span> <span class="n">real_key</span> <span class="o">==</span> <span class="kp">nil</span>
     <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">mapped_hmset</span> <span class="n">real_key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta</span><span class="o">]</span> 
   <span class="k">end</span>
   </pre></div>
@@ -188,23 +253,9 @@
         </div>
         <h2>Query</h2>
 
-<p><em>parameters: <code>metric_name</code>, <code>for</code>(required if set when created), <code>time_start</code>(optional), <code>time_end</code>(optional)</em></p>
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(optional), <code>meta_fields</code>(optional), <code>time_start</code>(optional), <code>time_end</code>(optional), <code>time_range</code>(optional)</em></p>
 
-<p>Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.</p>
-
-<p><code>metric_name</code>: The name of the metric to query, ex: <code>page_views</code>, <code>downloads</code></p>
-
-<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
-
-<p><code>ref_id</code>: <em>(optional)</em>: The reference ID that you set when you called <code>track</code> (if you set this, the time restraints is ignored)</p>
-
-<p><code>meta_fields</code> <em>(optional)</em>: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.</p>
-
-<p><code>time_start</code><em>(optional)</em>: The start of the time range to grab the data from.</p>
-
-<p><code>time_end</code><em>(optional)</em>: The end of the time range to grab the data from.</p>
-
-<p><code>time_range _(optional)_: Alternatively you can specify a time range, instead of</code>time<em>start<code>and</code>time</em>end.</p>
+<p>Query will return an array of all the metadata in chronological order from a time range, or for the whole data set.  If for is specified, it will limit it by that context.  For instance, if you have <code>track</code>ed several page views with <code>for</code> set to the name of the page that was viewed, you could query with <code>for</code> set to <code>home_page</code> to get all of the metadata from the page views from the home page, or you could leave off the <code>for</code>, and return all of the metadata for all of the page views, across all pages.</p>
 
 <h3>Usage</h3>
 
@@ -212,21 +263,16 @@
   for: &ldquo;home_page&rdquo;,
   time_start: 1.day.ago,
   time_end: Time.now)
-
-
-DulyNoted.query(&ldquo;page_views&rdquo;,
-  for: &ldquo;home_page&rdquo;,
-  time_range: 1.day.ago..Time.now)
 </code></pre>
       </td>
       <td class=code>
         <div class='highlight'><pre>  
   <span class="k">def</span> <span class="nf">query</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
-    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
     <span class="n">parse_time_range</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
-    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="n">assemble_for</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span>
-      <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span>
+      <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:ref:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:ref_id</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span>
       <span class="n">real_key</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">get</span> <span class="n">key</span>
       <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta_fields</span><span class="o">]</span>
         <span class="n">options</span><span class="o">[</span><span class="ss">:meta_fields</span><span class="o">].</span><span class="n">collect!</span> <span class="p">{</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="n">x</span><span class="o">.</span><span class="n">to_s</span> <span class="p">}</span>
@@ -239,6 +285,7 @@ DulyNoted.query(&ldquo;page_views&rdquo;,
         <span class="n">results</span> <span class="o">=</span> <span class="o">[</span><span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hgetall</span><span class="p">(</span><span class="n">real_key</span><span class="p">)</span><span class="o">]</span>
       <span class="k">end</span>
     <span class="k">else</span>
+      <span class="n">keys</span> <span class="o">=</span> <span class="n">find_keys</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
       <span class="n">grab_results</span> <span class="o">=</span> <span class="no">Proc</span><span class="o">.</span><span class="n">new</span> <span class="k">do</span> <span class="o">|</span><span class="n">metric</span><span class="o">|</span>
         <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:meta_fields</span><span class="o">]</span>
           <span class="n">options</span><span class="o">[</span><span class="ss">:meta_fields</span><span class="o">].</span><span class="n">collect!</span> <span class="p">{</span> <span class="o">|</span><span class="n">x</span><span class="o">|</span> <span class="n">x</span><span class="o">.</span><span class="n">to_s</span> <span class="p">}</span>
@@ -251,10 +298,15 @@ DulyNoted.query(&ldquo;page_views&rdquo;,
           <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">hgetall</span> <span class="n">metric</span>
         <span class="k">end</span>
       <span class="k">end</span>
+      <span class="n">results</span> <span class="o">=</span> <span class="o">[]</span>
       <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrangebyscore</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">grab_results</span><span class="p">)</span>
+        <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+          <span class="n">results</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrangebyscore</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">grab_results</span><span class="p">)</span>
+        <span class="k">end</span>
       <span class="k">else</span>
-        <span class="n">results</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrange</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">grab_results</span><span class="p">)</span>
+        <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+          <span class="n">results</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrange</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">collect</span><span class="p">(</span><span class="o">&amp;</span><span class="n">grab_results</span><span class="p">)</span>
+        <span class="k">end</span>
       <span class="k">end</span>
     <span class="k">end</span>
     <span class="k">return</span> <span class="n">results</span>
@@ -269,66 +321,171 @@ DulyNoted.query(&ldquo;page_views&rdquo;,
         </div>
         <h2>Count</h2>
 
-<p><em>parameters: <code>metric_name</code>, <code>for</code>(required if set when created), <code>time_start</code>(optional), <code>time_end</code>(optional)</em></p>
+<p><em>parameters: <code>metric_name</code>, <code>for</code>(optional), <code>time_start</code>(optional), <code>time_end</code>(optional), <code>time_range</code>(optional)</em></p>
 
-<p>Count will return the number of events logged in a given time range, or if no time range is given, the total count.</p>
-
-<p><code>metric_name</code>: The name of the metric to query, ex: <code>page_views</code>, <code>downloads</code></p>
-
-<p><code>for</code><em>(required if you set <code>for</code> when you generated the metric)</em>: A name space for your metric, ex: <code>home_page</code></p>
-
-<p><code>time_start</code><em>(optional)</em>: The start of the time range to grab the data from.</p>
-
-<p><code>time_end</code><em>(optional)</em>: The end of the time range to grab the data from.</p>
-
-<p><code>time_range _(optional)_: Alternatively you can specify a time range, instead of</code>time<em>start<code>and</code>time</em>end.</p>
+<p>Count will return the number of events logged in a given time range, or if no time range is given, the total count.  As with <code>#query</code>, you can specify <code>for</code> to return a subset of counts, or you can leave it off to get the count across the whole <code>metric_name</code>.</p>
 
 <h3>Usage</h3>
 
 <pre><code>DulyNoted.count(&ldquo;page_views&rdquo;,
   for: &ldquo;home_page&rdquo;,
-  time_start: Time.now,
-  time_end: 1.day.ago)
-
-
-DulyNoted.count(&ldquo;page_views&rdquo;,
-   for: &ldquo;home_page&rdquo;,
-   time_range: Time.now..1.day.ago)
+  time_start: 1.day.ago,
+  time_end: Time.now)
 </code></pre>
       </td>
       <td class=code>
         <div class='highlight'><pre>  
   <span class="k">def</span> <span class="nf">count</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
     <span class="n">parse_time_range</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
-    <span class="n">key</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
-    <span class="n">keys</span> <span class="o">=</span> <span class="o">[]</span>
-    <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span>
-      <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="s2">&quot;:</span><span class="si">#{</span><span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+    <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="n">assemble_for</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+    <span class="n">keys</span> <span class="o">=</span> <span class="n">find_keys</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="n">sum</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+      <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+        <span class="n">sum</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcount</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
+      <span class="k">end</span>
+      <span class="k">return</span> <span class="n">sum</span>
     <span class="k">else</span>
-      <span class="n">keys</span> <span class="o">&lt;&lt;</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">*&quot;</span><span class="p">)</span>
-      <span class="n">keys</span> <span class="o">-</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">*:meta&quot;</span><span class="p">)</span>
-      <span class="n">keys</span> <span class="o">-</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">keys</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">#{</span><span class="n">key</span><span class="si">}</span><span class="s2">:*:&quot;</span><span class="p">)</span>
-      <span class="n">keys</span><span class="o">.</span><span class="n">flatten!</span>
+      <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
+        <span class="n">sum</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcard</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+      <span class="k">end</span>
+      <span class="k">return</span> <span class="n">sum</span>
     <span class="k">end</span>
-    <span class="k">if</span> <span class="n">keys</span><span class="o">.</span><span class="n">empty?</span>
-      <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
-        <span class="k">return</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcount</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
-      <span class="k">else</span> 
-        <span class="k">return</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcard</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+  <span class="k">end</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Chart'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Chart">&#182;</a>
+        </div>
+        <h2>Chart</h2>
+
+<p><em>parameters: <code>metric_name</code>, <code>data_points</code>(required),<code>for</code>(optional), <code>time_start</code>(optional), <code>time_end</code>(optional), <code>time_range</code>(optional)</em></p>
+
+<p>Chart is a little complex, but I&rsquo;ll try to explain all of the possibilities.  It&rsquo;s main purpose is to pull out your data and prepare it in a way that makes it easy to chart.  The smallest amount of input it will take is just a <code>metric_name</code> and an amount of <code>data_points</code> to capture.  This will check the time of the earliest known data point, and the time of the last known data point, and run chart with those values as the <code>time_start</code> and <code>time_end</code> respectively.  It will take the amount of time that that spans, and divide it by the number of data points you asked for, and will split the time up evenly, and return a hash of times, and counts.  If you specify both a <code>time_start</code> and a <code>time_end</code>, and a number of <code>data_points</code>, then it will divide the amount of time that that spans and will return a hash of times and counts.  The other option is that you can specify either a <code>time_start</code> OR a <code>time_end</code> and a <code>step</code> and a number of <code>data_points</code>.  This will start at whatever time you specified, and (if it&rsquo;s <code>time_end</code>) count down by the step (if you specified <code>time_start</code>, it would count up), as many times as the number of data points you requested.</p>
+
+<h3>Usage</h3>
+
+<pre><code>DulyNoted.chart(&ldquo;page_views&rdquo;,
+  :time_range =&gt; 1.month.ago..Time.now,
+  :step =&gt; 1.day)
+
+DulyNoted.chart(&ldquo;page_views&rdquo;,
+  :time_range =&gt; 1.day.ago..Time.now,
+  :data_points =&gt; 12)
+
+DulyNoted.chart(&ldquo;page_views&rdquo;,
+  :time_start =&gt; 1.day.ago,
+  :step =&gt; 1.hour,
+  :data_points =&gt; 12)
+
+DulyNoted.chart(&ldquo;downloads&rdquo;,
+  :time_end =&gt; Time.now,
+  :step =&gt; 1.month,
+  :data_points =&gt; 12)
+
+DulyNoted.chart(&ldquo;page_views&rdquo;,
+  :data_points =&gt; 100)
+</code></pre>
+
+<p>Chart can be a little confusing but it&rsquo;s pretty powerful, so play around with it.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">def</span> <span class="nf">chart</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">{})</span>
+    <span class="n">parse_time_range</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+    <span class="n">chart</span> <span class="o">=</span> <span class="no">Hash</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+      <span class="n">time</span> <span class="o">=</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span>
+      <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:data_points</span><span class="o">]</span>
+        <span class="n">total_time</span> <span class="o">=</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span> <span class="o">-</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">=</span> <span class="n">total_time</span><span class="o">.</span><span class="n">to_i</span> <span class="o">/</span> <span class="n">options</span><span class="o">[</span><span class="ss">:data_points</span><span class="o">]</span>
       <span class="k">end</span>
+      <span class="k">while</span> <span class="n">time</span> <span class="o">&lt;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+        <span class="n">chart</span><span class="o">[</span><span class="n">time</span><span class="o">.</span><span class="n">to_i</span><span class="o">]</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="ss">:time_start</span> <span class="o">=&gt;</span> <span class="n">time</span><span class="p">,</span> <span class="ss">:time_end</span> <span class="o">=&gt;</span> <span class="n">time</span><span class="o">+</span><span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span><span class="p">,</span> <span class="ss">:for</span> <span class="o">=&gt;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:for</span><span class="o">]</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">+=</span> <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span>
+      <span class="k">end</span>
+    <span class="k">elsif</span> <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:data_points</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="p">(</span><span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span> <span class="o">||</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span><span class="p">)</span>
+      <span class="k">raise</span> <span class="no">InvalidStep</span> <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">==</span> <span class="mi">0</span>
+      <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">*=</span> <span class="o">-</span><span class="mi">1</span> <span class="k">if</span> <span class="p">(</span><span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span><span class="p">)</span> <span class="o">||</span> <span class="p">(</span><span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span><span class="p">)</span>
+      <span class="n">time</span> <span class="o">=</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">||</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
+      <span class="n">step</span> <span class="o">=</span> <span class="n">options</span><span class="o">[</span><span class="ss">:step</span><span class="o">]</span>
+      <span class="n">options</span><span class="o">[</span><span class="ss">:data_points</span><span class="o">].</span><span class="n">times</span> <span class="k">do</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">=</span> <span class="n">time</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">+=</span> <span class="n">step</span> <span class="k">if</span> <span class="n">step</span> <span class="o">&lt;</span> <span class="mi">0</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span> <span class="o">=</span> <span class="n">time</span>
+        <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span> <span class="o">+=</span> <span class="n">step</span> <span class="k">if</span> <span class="n">step</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">chart</span><span class="o">[</span><span class="n">time</span><span class="o">.</span><span class="n">to_i</span><span class="o">]</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">+=</span> <span class="n">step</span>
+      <span class="k">end</span>
+    <span class="k">elsif</span> <span class="n">options</span><span class="o">[</span><span class="ss">:data_points</span><span class="o">]</span>
+      <span class="n">key</span> <span class="o">=</span> <span class="n">build_key</span><span class="p">(</span><span class="n">metric_name</span><span class="p">)</span>
+      <span class="n">key</span> <span class="o">&lt;&lt;</span> <span class="n">assemble_for</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+      <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">=</span> <span class="no">Time</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrange</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="ss">:withscores</span> <span class="o">=&gt;</span> <span class="kp">true</span><span class="p">)</span><span class="o">[</span><span class="mi">1</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
+      <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span> <span class="o">=</span> <span class="no">Time</span><span class="o">.</span><span class="n">at</span><span class="p">(</span><span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zrevrange</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="ss">:withscores</span> <span class="o">=&gt;</span> <span class="kp">true</span><span class="p">)</span><span class="o">[</span><span class="mi">1</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
+      <span class="n">chart</span> <span class="o">=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">chart</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
     <span class="k">else</span>
-      <span class="n">sum</span> <span class="o">=</span> <span class="mi">0</span>
-      <span class="k">if</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">]</span> <span class="o">&amp;&amp;</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">]</span>
-        <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
-          <span class="n">sum</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcount</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_start</span><span class="o">].</span><span class="n">to_f</span><span class="p">,</span> <span class="n">options</span><span class="o">[</span><span class="ss">:time_end</span><span class="o">].</span><span class="n">to_f</span><span class="p">)</span>
-        <span class="k">end</span>
-        <span class="k">return</span> <span class="n">sum</span>
-      <span class="k">else</span>
-        <span class="n">keys</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">key</span><span class="o">|</span>
-          <span class="n">sum</span> <span class="o">+=</span> <span class="no">DulyNoted</span><span class="o">.</span><span class="n">redis</span><span class="o">.</span><span class="n">zcard</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
-        <span class="k">end</span>
-        <span class="k">return</span> <span class="n">sum</span>
-      <span class="k">end</span>
+      <span class="k">raise</span> <span class="no">InvalidOptions</span>
+    <span class="k">end</span>
+    <span class="k">return</span> <span class="n">chart</span>
+  <span class="k">end</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Magic'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Magic">&#182;</a>
+        </div>
+        <h2>Magic</h2>
+
+<h3>count_x_by_y</h3>
+
+<p>If you want to count a number of events by a meta field, you can use this magic command.  So imagine this scenario:</p>
+
+<pre><code>DulyNoted.track(&ldquo;page_views&rdquo;, meta: {browser: &ldquo;chrome&rdquo;})
+</code></pre>
+
+<p>And you wanted to see a break down of page views by various browsers, you can call <code>DulyNoted.count_page_views_by_browser</code> and you&rsquo;d get a hash that looked something like this:</p>
+
+<pre><code>{&ldquo;chrome&rdquo; =&gt; 2913, &ldquo;firefox&rdquo; =&gt; 5281, &ldquo;IE&rdquo; =&gt; 7182, &ldquo;safari&rdquo; =&gt; 3213}
+</code></pre>
+
+<p>So that method will work as soon as you&rsquo;ve tracked something with that metric name.  If you try to call the method on a metric that you haven&rsquo;t yet tracked you will get a <code>DulyNoted::NotValidMetric</code>.  But if you reference a meta field that didn&rsquo;t exist, you&rsquo;d just get a hash that looks like</p>
+
+<pre><code>{nil =&gt; 1}
+</code></pre>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">def</span> <span class="nf">count_x_by_y</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">meta_field</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+    <span class="n">options</span> <span class="o">||=</span> <span class="p">{}</span>
+    <span class="n">options</span> <span class="o">=</span> <span class="p">{</span><span class="ss">:meta_fields</span> <span class="o">=&gt;</span> <span class="o">[</span><span class="n">meta_field</span><span class="o">]</span><span class="p">}</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">options</span><span class="p">)</span>
+    <span class="n">meta_hashes</span> <span class="o">=</span> <span class="n">query</span><span class="p">(</span><span class="n">metric_name</span><span class="p">,</span> <span class="n">options</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="no">Hash</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+    <span class="n">meta_hashes</span><span class="o">.</span><span class="n">each</span> <span class="k">do</span> <span class="o">|</span><span class="n">meta_hash</span><span class="o">|</span>
+      <span class="n">result</span><span class="o">[</span><span class="n">meta_hash</span><span class="o">[</span><span class="n">meta_field</span><span class="o">]]</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">end</span>
+    <span class="n">result</span>
+  <span class="k">end</span></pre></div>
+      </td>
+    </tr>
+    <tr id='section-Behind_the_curtain_(metaprogramming)'>
+      <td class=docs>
+        <div class="pilwrap">
+          <a class="pilcrow" href="#section-Behind_the_curtain_(metaprogramming)">&#182;</a>
+        </div>
+        <h2>Behind the curtain (metaprogramming)</h2>
+
+<h3>method_missing</h3>
+
+<p>As I&rsquo;m sure you&rsquo;re aware, method_missing is the magic tool for ruby developers to define dynamic methods like the above <code>count_x_by_y</code>, which is exactly what we use it for.</p>
+      </td>
+      <td class=code>
+        <div class='highlight'><pre>  <span class="k">def</span> <span class="nf">method_missing</span><span class="p">(</span><span class="nb">method</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">&amp;</span><span class="n">block</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">method</span><span class="o">.</span><span class="n">to_s</span> <span class="o">=~</span> <span class="sr">/^count_(.+)_by_(.+)$/</span>
+      <span class="n">count_x_by_y</span><span class="p">(</span><span class="vg">$1</span><span class="p">,</span> <span class="vg">$2</span><span class="p">,</span> <span class="n">args</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span><span class="p">)</span>
+    <span class="k">else</span>
+      <span class="k">super</span>
     <span class="k">end</span>
   <span class="k">end</span>
   </pre></div>
@@ -359,15 +516,19 @@ DulyNoted.count(&ldquo;page_views&rdquo;,
     <span class="vi">@redis</span> <span class="o">||=</span> <span class="p">(</span>
       <span class="n">url</span> <span class="o">=</span> <span class="no">URI</span><span class="p">(</span><span class="vi">@redis_url</span> <span class="o">||</span> <span class="s2">&quot;redis://127.0.0.1:6379/0&quot;</span><span class="p">)</span>
 
-      <span class="no">Redis</span><span class="o">.</span><span class="n">new</span><span class="p">({</span>
+      <span class="n">check_schema</span><span class="p">(</span><span class="no">Redis</span><span class="o">.</span><span class="n">new</span><span class="p">({</span>
         <span class="ss">:host</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
         <span class="ss">:port</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
         <span class="ss">:db</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">path</span><span class="o">[</span><span class="mi">1</span><span class="o">.</span><span class="n">.</span><span class="o">-</span><span class="mi">1</span><span class="o">]</span><span class="p">,</span>
         <span class="ss">:password</span> <span class="o">=&gt;</span> <span class="n">url</span><span class="o">.</span><span class="n">password</span>
-      <span class="p">})</span>
+      <span class="p">}))</span>
     <span class="p">)</span>
   <span class="k">end</span>
-
+  <span class="k">class</span> <span class="nc">NotValidMetric</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+  <span class="k">class</span> <span class="nc">InvalidOptions</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+  <span class="k">class</span> <span class="nc">InvalidStep</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+  <span class="k">class</span> <span class="nc">InvalidRefId</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
+  <span class="k">class</span> <span class="nc">UpdateError</span> <span class="o">&lt;</span> <span class="no">StandardError</span><span class="p">;</span> <span class="k">end</span>
 <span class="k">end</span></pre></div>
       </td>
     </tr>

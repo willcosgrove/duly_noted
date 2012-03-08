@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
-require "eventmachine"
+$LOAD_PATH.unshift File.expand_path(File.dirname(__FILE__) + '/../lib')
+require "duly_noted/decay"
 
 puts <<-eos
    ______   __   __  ___      __   __ 
@@ -19,9 +20,4 @@ puts <<-eos
   | __ __    _ _ __ |__ _  _||__  |_ |  |_ _   
 eos
 
-EM.run do
-  if File.exist?("decay.yml")
-    puts "Decayfile detected"
-  end
-end
-
+DulyNoted::Decay.new

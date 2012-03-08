@@ -1,3 +1,5 @@
+_Currently being updated for v1.0.0..._
+
 #Duly Noted
 [![Build Status](https://secure.travis-ci.org/willcosgrove/duly_noted.png?branch=master)](http://travis-ci.org/willcosgrove/duly_noted)
 

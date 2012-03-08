@@ -4,8 +4,8 @@ require File.expand_path('../lib/duly_noted/version', __FILE__)
 Gem::Specification.new do |gem|
   gem.authors       = ["Will Cosgrove"]
   gem.email         = ["will@willcosgrove.com"]
-  gem.description   = %q{keep detailed metrics on your project with a speedy, powerful redis backend.}
-  gem.summary       = %q{a simple redis based stat-tracker}
+  gem.description   = %q{a simple redis based stat-tracker}
+  gem.summary       = %q{keep detailed metrics on your project with a speedy, powerful redis backend.}
   gem.homepage      = "http://github.com/willcosgrove/duly_noted"
 
   gem.executables   = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }

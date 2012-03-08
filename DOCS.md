@@ -95,11 +95,30 @@ Count will return the number of events logged in a given time range, or if no ti
 
 _parameters: `metric_name`, `data_points`(required),`for`(optional), `time_start`(optional), `time_end`(optional), `time_range`(optional)_
 
-Chart is a little complex, but I'll try to explain all of the possibilities.  The smallest amount of input it will take is just a `metric_name` and an amount of `data_points` to capture.  This will check the time of the earliest known data point, and the time of the last known data point, and run chart with those values as the `time_start` and `time_end` respectively.  It will take the amount of time that that spans, and divide it by the number of data points you asked for, and will split the time up evenly, and return a hash of times, and counts.  If you specify both a `time_start` and a `time_end`, and a number of `data_points`, then it will divide the amount of time that that spans and will return a hash of times and counts.  The other option is that you can specify either a `time_start` OR a `time_end` and a `step` and a number of `data_points`.  This will start at whatever time you specified, and (if it's `time_end`) count down by the step (if you specified `time_start`, it would count up), as many times as the number of data points you requested.
+Chart is a little complex, but I'll try to explain all of the possibilities.  It's main purpose is to pull out your data and prepare it in a way that makes it easy to chart.  The smallest amount of input it will take is just a `metric_name` and an amount of `data_points` to capture.  This will check the time of the earliest known data point, and the time of the last known data point, and run chart with those values as the `time_start` and `time_end` respectively.  It will take the amount of time that that spans, and divide it by the number of data points you asked for, and will split the time up evenly, and return a hash of times, and counts.  If you specify both a `time_start` and a `time_end`, and a number of `data_points`, then it will divide the amount of time that that spans and will return a hash of times and counts.  The other option is that you can specify either a `time_start` OR a `time_end` and a `step` and a number of `data_points`.  This will start at whatever time you specified, and (if it's `time_end`) count down by the step (if you specified `time_start`, it would count up), as many times as the number of data points you requested.
 
 ###Usage
 
-	
+	DulyNoted.chart("page_views",
+		:time_range => 1.month.ago..Time.now,
+		:step => 1.day)
+		
+	DulyNoted.chart("page_views",
+		:time_range => 1.day.ago..Time.now,
+		:data_points => 12)
+		
+	DulyNoted.chart("page_views",
+		:time_start => 1.day.ago,
+		:step => 1.hour,
+		:data_points => 12)
+		
+	DulyNoted.chart("downloads",
+		:time_end => Time.now,
+		:step => 1.month,
+		:data_points => 12)
+		
+	DulyNoted.chart("page_views",
+		:data_points => 100)
 	
 
 Chart can be a little confusing but it's pretty powerful, so play around with it.
@@ -120,6 +139,12 @@ So that method will work as soon as you've tracked something with that metric na
 
 	{nil => 1}
 	
+##Behind the curtain (metaprogramming)
+
+###method_missing
+
+As I'm sure you're aware, method_missing is the magic tool for ruby developers to define dynamic methods like the above `count_x_by_y`, which is exactly what we use it for.
+
 
 ##Redis
 

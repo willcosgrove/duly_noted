@@ -119,8 +119,8 @@ describe DulyNoted do
       1.times { DulyNoted.track "page_views", :generated_at => Time.now-(2.9) }
       2.times { DulyNoted.track "page_views", :generated_at => Time.now-(1.9) }
       3.times { DulyNoted.track "page_views", :generated_at => Time.now-(0.9) }
-      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :step => (1)}).should have_at_least(3).items
-      DulyNoted.chart("page_views", {:time_range => (Time.now-(3)..Time.now-(1)), :step => (1)}).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
+      DulyNoted.chart("page_views", :time_range => Time.now-(3)..Time.now-(1), :step => (1)).should have_at_least(3).items
+      DulyNoted.chart("page_views", :time_range => Time.now-(3)..Time.now-(1), :step => (1)).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
     end
     it "can count events between a time range, without a step set" do
       DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
@@ -184,6 +184,15 @@ describe DulyNoted do
     it "should raise NotValidMetric if the metric is not valid" do
       DulyNoted.track "page_views", :meta => {:browser => "chrome"}
       expect { DulyNoted.count_downloads_by_browser }.to raise_error(DulyNoted::NotValidMetric)
+    end
+  end
+
+  describe "#check_schema" do
+    it "should update the database if the schema is off by a major release" do
+      DulyNoted::VERSION = "2.0.0"
+      DulyNoted.redis = nil # Force a reset of the redis instance variable
+      DulyNoted.track "page_views"
+      DulyNoted.redis.get("dn:version").should eq("2.0.0")
     end
   end
 end

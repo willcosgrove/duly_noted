@@ -37,5 +37,24 @@ module DulyNoted
         options[:time_end] = options[:time_range].last
       end
     end
+
+    def metrics
+      DulyNoted.redis.smembers build_key("metrics", false)
+    end
+
+    def valid_metric?(metric_name)
+      DulyNoted.redis.sismember build_key("metrics", false), build_key(metric_name, false)
+    end
+
+    def fields_for(metric_name, options={})
+      key = build_key(metric_name)
+      key << assemble_for(options)
+      keys = find_keys(key)
+      fields = []
+      keys.each do |key|
+        fields += DulyNoted.redis.smembers("#{key}:fields")
+      end
+      fields
+    end
   end
 end

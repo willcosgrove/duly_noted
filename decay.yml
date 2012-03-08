@@ -1,0 +1,5 @@
+decay:
+  - after: 1.day
+    group_by: 1.hour
+  - after: 1.month
+    group_by: 1.day

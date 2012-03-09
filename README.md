@@ -75,14 +75,5 @@ to your `gemfile` and run `bundle install`
 * Resolution decay: currently, duly_noted stores all metrics at the highest resolution, timestamped down to a fraction of a second.  With resolution decay, you can specify fall offs so that after, say, a month, they'll be grouped by day.  So after a month has passed, you couldn't go back to a day and see it by hour, only total for that day.  This will tremendously cut back on space, and is, of course, totally customizable. 
 
 
-
-##To Do
-
-* Count by meta fields: How many page views from each browser?
-
-* A `chart` method which would take a `time_start`, `time_end`, and a `granularity` which would allow you to easily get the per hour for each hour for the past day, for example.
-
-* Maybe some Rails view helpers to generate some code for a Javascript charting library, or Google Charts API.
-
 ##Contributing
 If you want to help, you should do it.  Fork it, fix it, and send me a pull request.  I will be delighted.

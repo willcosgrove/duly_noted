@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe DulyNoted do
   before :each do
-    DulyNoted.redis.flushdb
+    DulyNoted.redis.flushall
     Timecop.return
   end
 
@@ -123,19 +123,19 @@ describe DulyNoted do
       DulyNoted.chart("page_views", :time_range => Time.now-(3)..Time.now-(1), :step => (1)).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
     end
     it "can count events between a time range, without a step set" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
-      DulyNoted.chart("page_views", :time_range => Chronic.parse("yesterday at 12pm")...Chronic.parse("yesterday at 2pm"), :data_points => 2).should eq({Chronic.parse("yesterday at 12pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_range => Chronic.parse("yesterday at 12am")...Chronic.parse("yesterday at 2am"), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
     end
     it "will take time_start, step, and data_points options to build a chart" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
-      DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12pm"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
     end
     it "will take time_end, step, and data_points options to build a chart" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
-      DulyNoted.chart("page_views", :time_end => Chronic.parse("yesterday at 2pm"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :time_end => Chronic.parse("yesterday at 2am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
     end
     it "should raise InvalidStep if you give it a step of zero" do
       DulyNoted.track "page_views"
@@ -146,9 +146,9 @@ describe DulyNoted do
       expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 60*60) }.to raise_error(DulyNoted::InvalidOptions)
     end
     it "should chart everything if no time range is specified" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
-      DulyNoted.chart("page_views", :data_points => 2).should eq({Chronic.parse("yesterday at 12:30pm").to_i => 1, Chronic.parse("yesterday at 12:55pm").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
+      DulyNoted.chart("page_views", :data_points => 2).should eq({Chronic.parse("yesterday at 12:30am").to_i => 1, Chronic.parse("yesterday at 12:55am").to_i => 1})
     end
   end
 

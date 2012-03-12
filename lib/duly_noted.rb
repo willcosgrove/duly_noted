@@ -114,10 +114,9 @@ module DulyNoted
   def track(metric_name, options={})
     options = {:generated_at => Time.now}.merge(options)
     key = build_key(metric_name)
-    key_without_for = key.dup
     key << assemble_for(options)
     DulyNoted.redis.pipelined do
-      DulyNoted.redis.sadd build_key("metrics", false), key_without_for
+      DulyNoted.redis.sadd build_key("metrics"), build_key(metric_name)
       DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
       DulyNoted.redis.set "#{build_key(metric_name)}:ref:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
       DulyNoted.redis.expire "#{build_key(metric_name)}:ref:#{options[:ref_id]}", options[:editable_for] if options[:editable_for]

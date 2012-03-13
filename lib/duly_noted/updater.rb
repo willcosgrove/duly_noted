@@ -4,8 +4,10 @@ require "duly_noted/helpers"
 module DulyNoted
   module Updater
     def update_schema(schema_version, redis)
+      time = Time.now
       if schema_version = [1,0,0]
         #update to 1.0.1
+        puts "Updating schema to comply with duly_noted 1.0.1"
         metrics = redis.smembers "dn:metrics"
         metrics.each do |metric|
           keys = find_keys(metric, redis)
@@ -29,7 +31,7 @@ module DulyNoted
         schema_version = [1,0,1]
       end
       redis.set "dn:version", VERSION
-      puts "All up to date"
+      puts "All up to date.  Completed updates in #{Time.now-time} seconds."
       return true
     end
 

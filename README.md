@@ -45,7 +45,23 @@ or add
 
 to your `gemfile` and run `bundle install`
 
+##Configuration
+_New in 1.0.2_
+
+You can now configure the \**ahem*\* setting with the `configure` method in an initializer, like so:
+
+	DulyNoted.configure do |config|
+		config.editable_for = 3600 # default is one hour
+	end
+
+The `editable_for` configuration option will set the expiration on the id keys so your Redis database's key count and size doesn't shoot up crazy high.  The default is for them to expire after one hour.
+
+
 ##What's New
+
+### 1.0.2
+* The motivation behind this release was to restore precious precious redis space back to our user(s)
+* This update adds a `#configure` method which takes a block with one variable and allows you to set configuration setting(s).  Currently there's only one configuration option, and that's `editable_for`, which will let you set the expire time on the `id` keys.  So if you're not going to edit the meta hashes after a day, you could set it to `1.day`.  Alternatively, if you're never going to edit the meta hashes, you could set it to `0`, which will delete them immediately.
 
 ### 1.0.1
 * The main motivation behind this release was to stop using the timestamp as the unique identifier for the tracked metrics.  We can only capture the time so precicely with ruby, and redis can take in so many metrics a second, that it would be possible to get duplicate timestamps, even when we measure the time to the millisecond.  Using unique ids will make sure that you are not limited by duly_noted, but by the much more capable Redis.

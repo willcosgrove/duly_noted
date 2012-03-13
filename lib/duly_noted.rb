@@ -115,6 +115,7 @@ module DulyNoted
       DulyNoted.redis.sadd build_key("metrics", false), key_without_for
       DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{id}:meta"
       DulyNoted.redis.set "dnid:#{id}", "#{key}:#{id}:meta" # set alias key
+      DulyNoted.redis.expire "dnid:#{id}", DulyNoted::Configuration.editable_for
       if options[:meta] # set meta data
         DulyNoted.redis.mapped_hmset "#{key}:#{id}:meta", options[:meta]
         options[:meta].keys.each do |field|
@@ -373,7 +374,7 @@ module DulyNoted
   end
 
   def configure
-    yield DulyNoted::Config
+    yield DulyNoted::Configuration
   end
 
   class NotValidMetric < StandardError; end

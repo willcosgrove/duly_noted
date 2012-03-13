@@ -114,24 +114,26 @@ module DulyNoted
   def track(metric_name, options={})
     options = {:generated_at => Time.now}.merge(options)
     key = build_key(metric_name)
+    key_without_for = key.dup
+    id = DulyNoted.redis.incr "dnid"
     key << assemble_for(options)
     DulyNoted.redis.pipelined do
-      DulyNoted.redis.sadd build_key("metrics"), build_key(metric_name)
-      DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{options[:generated_at].to_f}:meta"
-      DulyNoted.redis.set "#{build_key(metric_name)}:ref:#{options[:ref_id]}", "#{key}:#{options[:generated_at].to_f}:meta" if options[:ref_id] # set alias key
-      DulyNoted.redis.expire "#{build_key(metric_name)}:ref:#{options[:ref_id]}", options[:editable_for] if options[:editable_for]
+      DulyNoted.redis.sadd build_key("metrics", false), key_without_for
+      DulyNoted.redis.zadd key, options[:generated_at].to_f, "#{key}:#{id}:meta"
+      DulyNoted.redis.set "dnid:#{id}", "#{key}:#{id}:meta" # set alias key
       if options[:meta] # set meta data
-        DulyNoted.redis.mapped_hmset "#{key}:#{options[:generated_at].to_f}:meta", options[:meta]
+        DulyNoted.redis.mapped_hmset "#{key}:#{id}:meta", options[:meta]
         options[:meta].keys.each do |field|
           DulyNoted.redis.sadd "#{key}:fields", field
         end
       end
     end
+    id
   end
   
   #   ##Update
   # 
-  # _parameters: `metric_name`, `ref_id`, `meta`(optional), `editable_for`(optional)_
+  # _parameters: `id`, `meta`(optional)_
   # 
   # Use update to add, or edit the metadata stored with a metric.  You can optionally set the `editable_for` option which will override any setting set by track.  So if it was set to expire in 30 seconds, and in 20 seconds you called update with `editable_for` set to `30`, it would be editable for 30 seconds from the moment you updated it.
   # 
@@ -145,11 +147,10 @@ module DulyNoted
   #       meta: { time_on_page: 30 },
   #       editable_for: 30)
   
-  def update(metric_name, ref_id, options={})
-    key = build_key(metric_name)
-    key << ":ref:#{ref_id}"
+  def update(id, options={})
+    key = "dnid:#{id}"
     real_key = DulyNoted.redis.get key
-    raise InvalidRefId if real_key == nil
+    raise InvalidId if real_key == nil
     DulyNoted.redis.mapped_hmset real_key, options[:meta] if options[:meta] 
   end
   
@@ -171,8 +172,8 @@ module DulyNoted
     key = build_key(metric_name)
     parse_time_range(options)
     key << assemble_for(options)
-    if options[:ref_id]
-      key << ":ref:#{options[:ref_id]}"
+    if options[:id]
+      key = "dnid:#{options[:id]}"
       real_key = DulyNoted.redis.get key
       if options[:meta_fields]
         options[:meta_fields].collect! { |x| x.to_s }
@@ -382,6 +383,6 @@ module DulyNoted
   class NotValidMetric < StandardError; end
   class InvalidOptions < StandardError; end
   class InvalidStep < StandardError; end
-  class InvalidRefId < StandardError; end
+  class InvalidId < StandardError; end
   class UpdateError < StandardError; end
 end

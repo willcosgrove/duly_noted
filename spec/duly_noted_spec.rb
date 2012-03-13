@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe DulyNoted do
   before :each do
-    DulyNoted.redis.flushall
+    DulyNoted.redis.flushdb
     Timecop.return
   end
 
@@ -32,27 +32,23 @@ describe DulyNoted do
       DulyNoted.track "page_views", :generated_at => Time.now-10
       DulyNoted.count "page_views", :time_range => Time.now-11..Time.now-9
     end
-    it "will allow you to set expirations on `ref_id`s" do
-      DulyNoted.track "page_views", :meta => {:open => true}, :ref_id => "unique", :editable_for => 0
-      expect { DulyNoted.update("page_views", "unique") }.to raise_error(DulyNoted::InvalidRefId)
-    end
   end
 
   describe "#update" do
     it "overwrites duplicate keys" do
-      DulyNoted.track "page_views", :meta => {:seconds_open => 0}, :ref_id => "unique"
-      DulyNoted.update "page_views", "unique", :meta => {:seconds_open => 5}
+      id = DulyNoted.track "page_views", :meta => {:seconds_open => 0}
+      DulyNoted.update id, :meta => {:seconds_open => 5}
       DulyNoted.query("page_views").should include({"seconds_open" => "5"})
       DulyNoted.query("page_views").should_not include({"seconds_open" => "0"})
     end
     it "doesn't replace old hash" do
-      DulyNoted.track "page_views", :meta => {:seconds_open => 0}, :ref_id => "unique"
-      DulyNoted.update "page_views", "unique", :meta => {:ip_address => "19.27.182.32"}
+      id = DulyNoted.track "page_views", :meta => {:seconds_open => 0}
+      DulyNoted.update id, :meta => {:ip_address => "19.27.182.32"}
       DulyNoted.query("page_views").should include({"seconds_open" => "0", "ip_address" => "19.27.182.32"})
     end
     it "does not require that `for:` be set to update" do
-      DulyNoted.track "page_views", :for => "home", :meta => {:seconds_open => 0}, :ref_id => "unique"
-      DulyNoted.update "page_views", "unique", :meta => {:seconds_open => 5}
+      id = DulyNoted.track "page_views", :for => "home", :meta => {:seconds_open => 0}
+      DulyNoted.update id, :meta => {:seconds_open => 5}
       DulyNoted.query("page_views").should include({"seconds_open" => "5"})
     end
   end
@@ -62,11 +58,11 @@ describe DulyNoted do
       DulyNoted.track "page_views", :meta => {:seconds_open => 0, :browser => "chrome"}
       DulyNoted.query("page_views").should include({"seconds_open" => "0", "browser" => "chrome"})
     end
-    it "can query a certain ref_id" do
-      DulyNoted.track "page_views", :meta => {:seconds_open => 0, :browser => "chrome"}, :ref_id => "unique"
+    it "can query a certain id" do
+      id = DulyNoted.track "page_views", :meta => {:seconds_open => 0, :browser => "chrome"}
       DulyNoted.track "page_views", :meta => {:seconds_open => 10, :browser => "firefox"}
-      DulyNoted.query("page_views", :ref_id => "unique").should include({"seconds_open" => "0", "browser" => "chrome"})
-      DulyNoted.query("page_views", :ref_id => "unique").should_not include({"seconds_open" => "10", "browser" => "firefox"})
+      DulyNoted.query("page_views", :id => id).should include({"seconds_open" => "0", "browser" => "chrome"})
+      DulyNoted.query("page_views", :id => id).should_not include({"seconds_open" => "10", "browser" => "firefox"})
     end
     it "can grab only specific fields from the hash" do
       DulyNoted.track "page_views", :meta => {:seconds_open => 0, :browser => "chrome"}
@@ -123,19 +119,19 @@ describe DulyNoted do
       DulyNoted.chart("page_views", :time_range => Time.now-(3)..Time.now-(1), :step => (1)).should eq({(Time.now-3).to_i => 1, (Time.now-2).to_i => 2, (Time.now-1).to_i => 3})
     end
     it "can count events between a time range, without a step set" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
-      DulyNoted.chart("page_views", :time_range => Chronic.parse("yesterday at 12am")...Chronic.parse("yesterday at 2am"), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
+      DulyNoted.chart("page_views", :time_range => Chronic.parse("yesterday at 12pm")...Chronic.parse("yesterday at 2pm"), :data_points => 2).should eq({Chronic.parse("yesterday at 12pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
     end
     it "will take time_start, step, and data_points options to build a chart" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
-      DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
+      DulyNoted.chart("page_views", :time_start => Chronic.parse("yesterday at 12pm"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 12pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
     end
     it "will take time_end, step, and data_points options to build a chart" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
-      DulyNoted.chart("page_views", :time_end => Chronic.parse("yesterday at 2am"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2am").to_i => 1, Chronic.parse("yesterday at 1am").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
+      DulyNoted.chart("page_views", :time_end => Chronic.parse("yesterday at 2pm"), :step => (3600), :data_points => 2).should eq({Chronic.parse("yesterday at 2pm").to_i => 1, Chronic.parse("yesterday at 1pm").to_i => 1})
     end
     it "should raise InvalidStep if you give it a step of zero" do
       DulyNoted.track "page_views"
@@ -146,9 +142,9 @@ describe DulyNoted do
       expect { DulyNoted.chart("page_views", :time_end => Time.now, :step => 60*60) }.to raise_error(DulyNoted::InvalidOptions)
     end
     it "should chart everything if no time range is specified" do
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30am")
-      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20am")
-      DulyNoted.chart("page_views", :data_points => 2).should eq({Chronic.parse("yesterday at 12:30am").to_i => 1, Chronic.parse("yesterday at 12:55am").to_i => 1})
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 12:30pm")
+      DulyNoted.track "page_views", :generated_at => Chronic.parse("yesterday at 1:20pm")
+      DulyNoted.chart("page_views", :data_points => 2).should eq({Chronic.parse("yesterday at 12:30pm").to_i => 1, Chronic.parse("yesterday at 12:55pm").to_i => 1})
     end
   end
 

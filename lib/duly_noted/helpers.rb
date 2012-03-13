@@ -23,12 +23,13 @@ module DulyNoted
       end
     end
 
-    def find_keys(key)
+    def find_keys(key, redis=nil)
+      redis ||= DulyNoted.redis
       keys = []
-      keys += DulyNoted.redis.keys("#{key}*")
-      keys -= DulyNoted.redis.keys("#{key}:*:meta")
-      keys -= DulyNoted.redis.keys("#{key}:ref:*")
-      keys -= DulyNoted.redis.keys("#{key}*fields")
+      keys += redis.keys("#{key}*")
+      keys -= redis.keys("#{key}:*:meta")
+      keys -= redis.keys("#{key}:ref:*")
+      keys -= redis.keys("#{key}*fields")
     end
 
     def parse_time_range(options)

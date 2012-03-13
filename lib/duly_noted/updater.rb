@@ -1,9 +1,33 @@
 require "duly_noted/version"
+require "duly_noted/helpers"
 
 module DulyNoted
   module Updater
     def update_schema(schema_version, redis)
-      # magic updating!
+      if schema_version = [1,0,0]
+        #update to 1.0.1
+        metrics = redis.smembers "dn:metrics"
+        metrics.each do |metric|
+          keys = find_keys(metric, redis)
+          keys.each do |key|
+            events = redis.zrange key, 0, -1
+            events.each do |event|
+              id = redis.incr "dnid"
+              redis.zadd(key, redis.zscore(key, event), event.gsub(/:\d{10}.\d+:/, ":#{id}:"))
+              redis.set("dnid:#{id}", "#{key}:#{id}:meta")
+              if(redis.exists(event))
+                redis.mapped_hmset "#{key}:#{id}:meta", redis.hgetall(event)
+                redis.del(event)
+              end
+              redis.zrem(key, event)
+            end
+          end
+        end
+        redis.keys("*:ref:*").each do |ref_keys|
+          redis.del(ref_keys)
+        end
+        schema_version = [1,0,1]
+      end
       redis.set "dn:version", VERSION
       puts "All up to date"
       return true
@@ -14,8 +38,7 @@ module DulyNoted
       if !schema_version.nil?
         schema_version = schema_version.split(".")
         current_version = VERSION.split(".")
-        if schema_version[0] != current_version[0]
-          puts "Your duly_noted schema needs to be updated"
+        if schema_version != current_version
           if update_schema(schema_version.join("."), redis)
             check_schema(redis)
           else

@@ -39,7 +39,7 @@ module DulyNoted
         schema_version = schema_version.split(".")
         current_version = VERSION.split(".")
         if schema_version != current_version
-          if update_schema(schema_version.join("."), redis)
+          if update_schema(schema_version, redis)
             check_schema(redis)
           else
             raise UpdateError

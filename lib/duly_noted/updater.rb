@@ -6,7 +6,7 @@ module DulyNoted
   module Updater
     def update_schema(schema_version, redis)
       time = Time.now
-      if schema_version == [1,0,0]
+      if schema_version === ["1","0","0"]
         #update to 1.0.1
         puts "Updating schema to comply with duly_noted 1.0.1"
         metrics = redis.smembers "dn:metrics"
@@ -29,14 +29,15 @@ module DulyNoted
         redis.keys("*:ref:*").each do |ref_keys|
           redis.del(ref_keys)
         end
-        schema_version = [1,0,1]
+        schema_version = ["1","0","1"]
       end
-      if schema_version == [1,0,1]
+      if schema_version === ["1","0","1"]
         #update to 1.0.2
         puts "Updating schema to comply with duly_noted 1.0.2"
         redis.keys("dnid:*").each do |id_key|
           redis.expire id_key, Configuration.editable_for
         end
+        schema_version = ["1","0","2"]
       end
       redis.set "dn:version", VERSION
       puts "All up to date.  Completed updates in #{Time.now-time} seconds."

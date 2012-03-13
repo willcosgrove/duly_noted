@@ -21,10 +21,6 @@ The **DulyNoted** module contains five main methods:
 
 `meta_fields`: An array of fields to retrieve from the meta hash.  If not specified, the entire hash will be grabbed.  Fields will be converted to strings, because redis converts all hash keys and values to strings.
 
-`ref_id`: If you need to reference the metric later, perhaps to add more metadata later on, you can set a reference id that you can use to update the metric.  The `ref_id` must be unique across `metric_name`s.
-
-`editable_for`: If you want to clear `ref_id`s out, you can set the metric to only be editable for a certain amount of time.  `editable_for` is defined in seconds.  After that amount of time, you will no longer be able to edit the meta data, and you may use that `ref_id` again.  By default, `ref_id`s never expire.
-
 `time_start`: The start of the time range to grab the data from.  **Important:**  `time_start` should always be the time farthest in the past.
 
 `time_end`: The end of the time range to grab the data from.  **Important:** `time_end` should always be the time closest to the present.
@@ -35,9 +31,11 @@ The **DulyNoted** module contains five main methods:
 
 ##Track
 
-_parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional), `ref_id`(optional), `editable_for`(optional)_
+_parameters: `metric_name`, `for`(optional), `generated_at`(optional), `meta`(optional)_
 
-Use track to track an event, like a page view, or a download.  Use the `for` option to give an event a context.  For instance, for page views, you might set `for` to `home_page`, so that you know which page was viewed.  You can also store metadata along with your metric with the `meta` hash.  If you need to update that `meta` hash at a later time, you can set a `ref_id`, which can be used to tell `#update` exactly which metric you want to update.  `ref_id`s have to be unique across `metric_name`s, and if you want to free up your `ref_id`s, you can set them to expire after a certain number of seconds with `editable_for`.
+_returns: `id` for editing metadata_
+
+Use track to track an event, like a page view, or a download.  Use the `for` option to give an event a context.  For instance, for page views, you might set `for` to `home_page`, so that you know which page was viewed.  You can also store metadata along with your metric with the `meta` hash.
 
 ###Usage
 
@@ -45,21 +43,21 @@ Use track to track an event, like a page view, or a download.  Use the `for` opt
 	
 	DulyNoted.track("video_plays", for: ["user_7261", "video_917216"], meta: {amount_watched: 0})
 	
-	DulyNoted.track("purchases", for: "user_281", generated_at: 1.day.ago, ref_id: "pid_28172", editable_for: 30)
+	DulyNoted.track("purchases", for: "user_281", generated_at: 1.day.ago)
 
 
 
 ##Update
 
-_parameters: `metric_name`, `ref_id`, `meta`(optional), `editable_for`(optional)_
+_parameters: `id`, `meta`(optional)_
 
-Use update to add, or edit the metadata stored with a metric.  You can optionally set the `editable_for` option which will override any setting set by track.  So if it was set to expire in 30 seconds, and in 20 seconds you called update with `editable_for` set to `30`, it would be editable for 30 seconds from the moment you updated it.
+Use update to add, or edit the metadata stored with a metric.
 
 ###Usage
 
-	DulyNoted.track("page_views", ref_id: "a_unique_id", meta: {time_on_page: 0, browser: "chrome"})
+	DulyNoted.track("page_views", meta: {time_on_page: 0, browser: "chrome"}) # => 5673
 	
-    DulyNoted.update("page_views", "a_unique_id", meta: { time_on_page: 30 }, editable_for: 30)
+    DulyNoted.update(5673, meta: { time_on_page: 30 })
 
 
 

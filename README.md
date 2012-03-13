@@ -47,6 +47,12 @@ to your `gemfile` and run `bundle install`
 
 ##What's New
 
+### 1.0.1
+* Obliterated `ref_id`s, and everything they stood for.  Not really everything they stood for.  Now each metric gets its own unique id.
+* `#track` now returns the id of the metric you just tracked
+* id's are unique across all of duly_noted, so when you update them with `#update` you don't need to specify which metric_name
+* The first time you run a duly_noted command after updating the gem, it will attempt to update your redis schema.  I did this on my own duly_noted setup with about 110k worth of unique metrics tracked, a DB size of 19MB, and a key count of 6 to a DB size of 35MB and a key count of 110600 in 75.26 seconds.  In the next version, I'm either going to move the id keys into a hash, so it doesn't pollute the global keyspace any more than it has to, or, I'm going to set a default expire time on each id reference key.  I'm leaning towards the expiration idea, because I don't think people have a use for being able to update any metric entry at any time.
+
 ### 1.0.0
 * `for` is no longer required on `count` and `query`.  If you call one of them without `for` it will count all of whatever metric you specified
 * Added the `chart` method, which allows you to pull out your data in a handy way that's perfect for giving it to a charting library

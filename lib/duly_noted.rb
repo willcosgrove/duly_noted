@@ -46,6 +46,7 @@ require "uri"
 require "duly_noted/helpers"
 require "duly_noted/version"
 require "duly_noted/updater"
+require 'duly_noted/configuration'
 
 # The **DulyNoted** module contains five main methods:
 
@@ -58,6 +59,7 @@ require "duly_noted/updater"
 module DulyNoted
   include Helpers
   include Updater
+  include Configuration
   extend self # the following are class methods
 
 # ##Parameter Descriptions
@@ -369,6 +371,11 @@ module DulyNoted
       }))
     )
   end
+
+  def configure
+    yield DulyNoted::Config
+  end
+
   class NotValidMetric < StandardError; end
   class InvalidOptions < StandardError; end
   class InvalidStep < StandardError; end

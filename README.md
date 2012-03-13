@@ -48,6 +48,7 @@ to your `gemfile` and run `bundle install`
 ##What's New
 
 ### 1.0.1
+* The main motivation behind this release was to stop using the timestamp as the unique identifier for the tracked metrics.  We can only capture the time so precicely with ruby, and redis can take in so many metrics a second, that it would be possible to get duplicate timestamps, even when we measure the time to the millisecond.  Using unique ids will make sure that you are not limited by duly_noted, but by the much more capable Redis.
 * Obliterated `ref_id`s, and everything they stood for.  Not really everything they stood for.  Now each metric gets its own unique id.
 * `#track` now returns the id of the metric you just tracked
 * id's are unique across all of duly_noted, so when you update them with `#update` you don't need to specify which metric_name

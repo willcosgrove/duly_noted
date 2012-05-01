@@ -57,10 +57,8 @@ require 'duly_noted/configuration'
 # * `chart`
 
 module DulyNoted
-  include Helpers
-  include Updater
-  include Configuration
-  extend self # the following are class methods
+  extend Helpers
+  module_function # the following are class methods
 
 # ##Parameter Descriptions
 # `metric_name`: The name of the metric to track, ex: `page_views`, `downloads`
@@ -364,7 +362,7 @@ module DulyNoted
     @redis ||= (
       url = URI(@redis_url || "redis://127.0.0.1:6379/0")
 
-      check_schema(Redis.new({
+      Updater.check_schema(Redis.new({
         :host => url.host,
         :port => url.port,
         :db => url.path[1..-1],

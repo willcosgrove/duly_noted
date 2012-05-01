@@ -9,6 +9,9 @@ module DulyNoted
     end
 
     def normalize(str)
+      if str.is_a?(Symbol)
+        str = str.to_s
+      end
       str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
     end
 

@@ -1,6 +1,6 @@
 module DulyNoted
   module Configuration
-    extend self
+    module_function
     
     @data = {:editable_for => 3600}
 

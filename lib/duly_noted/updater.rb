@@ -4,6 +4,7 @@ require "duly_noted/configuration"
 
 module DulyNoted
   module Updater
+    module_function
     def update_schema(schema_version, redis)
       time = Time.now
       if schema_version === ["1","0","0"]

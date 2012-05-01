@@ -14,14 +14,13 @@ Gem::Specification.new do |gem|
   gem.name          = "duly_noted"
   gem.require_paths = ["lib"]
   gem.version       = DulyNoted::VERSION
-  gem.add_dependency("redis")
-  gem.add_development_dependency("rspec")
-  gem.add_development_dependency("rake")
-  gem.add_development_dependency("rb-fsevent")
-  gem.add_development_dependency("guard-rspec")
-  # gem.add_development_dependency("growl")
-  gem.add_development_dependency("guard-bundler")
-  gem.add_development_dependency("chronic")
-  gem.add_development_dependency("timecop")
-  gem.add_development_dependency("ruby_gntp")
+  gem.add_dependency "redis", "~> 2.2.2"
+  gem.add_development_dependency "rspec", "~> 2.8.0"
+  gem.add_development_dependency "rake", "~> 0.9.2.2"
+  gem.add_development_dependency "rb-fsevent", "~> 0.9.0"
+  gem.add_development_dependency "guard-rspec", "~> 0.6.0"
+  gem.add_development_dependency "guard-bundler", "~> 0.1.3"
+  gem.add_development_dependency "chronic", "~> 0.6.7"
+  gem.add_development_dependency "timecop", "~> 0.3.5"
+  gem.add_development_dependency "ruby_gntp", "~> 0.3.4"
 end

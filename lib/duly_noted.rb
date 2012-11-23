@@ -345,22 +345,25 @@ module DulyNoted
       super
     end
   end
-  
+
   # ##Redis
-  # 
-  # DulyNoted will try to connect to Redis's default url and port if you don't specify a Redis connection URL. You can set the url with the method
-  # 
-  #     DulyNoted.redis = REDIS_URL
-  
-  def redis=(url)
+  #
+  # DulyNoted will try to connect to Redis's default url and port if you don't specify a Redis connection URL. You can set the url or redis client with the method
+  #
+  #     DulyNoted.redis = "redis://127.0.0.1:6379/0"
+  # or
+  #     DulyNoted.redis = Redis.new
+  #
+  def redis=(server)
     @redis = nil
-    @redis_url = url
-    redis
+    @redis_config = server
   end
 
+  # Returns the current Redis connection. If none has been created, will
+  # create a new one.
   def redis
-    @redis ||= (
-      url = URI(@redis_url || "redis://127.0.0.1:6379/0")
+    @redis ||= if @redis_config.nil? || @redis_config.kind_of?(String)
+      url = URI(@redis_config || "redis://127.0.0.1:6379/0")
 
       Updater.check_schema(Redis.new({
         :host => url.host,
@@ -368,7 +371,9 @@ module DulyNoted
         :db => url.path[1..-1],
         :password => url.password
       }))
-    )
+    else
+      Updater.check_schema(@redis_config)
+    end
   end
 
   def configure

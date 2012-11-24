@@ -1,4 +1,5 @@
 require 'spec_helper'
+require 'base64'
 
 describe DulyNoted::Helpers do
   before :each do
@@ -21,6 +22,13 @@ describe DulyNoted::Helpers do
 
     it "should find a key when matching exactly" do
       DulyNoted.find_keys("dn:pageviews:users:1").should == ["dn:pageviews:users:1"]
+    end
+  end
+
+  describe "#normalize" do
+    it "should allow base64 encoded content" do
+      encoded = Base64.encode64("http://google.de")
+      Base64.decode64(DulyNoted.normalize(encoded)).should == "http://google.de"
     end
   end
 end

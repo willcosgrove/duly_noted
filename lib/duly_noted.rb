@@ -296,8 +296,8 @@ module DulyNoted
     elsif options[:data_points]
       key = build_key(metric_name)
       key << assemble_for(options)
-      options[:time_start] = Time.at(DulyNoted.redis.zrange(key, 0, 0, :withscores => true)[1].to_f)
-      options[:time_end] = Time.at(DulyNoted.redis.zrevrange(key, 0, 0, :withscores => true)[1].to_f)
+      options[:time_start] = Time.at(DulyNoted.redis.zrange(key, 0, 0, :with_scores => true)[0][1])
+      options[:time_end] = Time.at(DulyNoted.redis.zrevrange(key, 0, 0, :with_scores => true)[0][1])
       chart = DulyNoted.chart(metric_name, options)
     else
       raise InvalidOptions

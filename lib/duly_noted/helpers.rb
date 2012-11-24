@@ -9,10 +9,7 @@ module DulyNoted
     end
 
     def normalize(str)
-      if str.is_a?(Symbol)
-        str = str.to_s
-      end
-      str.downcase.gsub(/[^a-z0-9 ]/i, '').strip
+      str.to_s.gsub(/[^a-z0-9 =]/i, '').strip
     end
 
     def assemble_for(options)
@@ -26,13 +23,15 @@ module DulyNoted
       end
     end
 
+    # Attention: this is a rather slow implementation using "KEYS" command. Perhaps we should use sets?
     def find_keys(key, redis=nil)
       redis ||= DulyNoted.redis
       keys = []
-      keys += redis.keys("#{key}*")
+      keys += redis.keys("#{key}:*")
+      keys += redis.keys("#{key}")
       keys -= redis.keys("#{key}:*:meta")
       keys -= redis.keys("#{key}:ref:*")
-      keys -= redis.keys("#{key}*fields")
+      keys -= redis.keys("#{key}:*fields")
     end
 
     def parse_time_range(options)

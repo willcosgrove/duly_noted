@@ -14,7 +14,7 @@ Gem::Specification.new do |gem|
   gem.name          = "duly_noted"
   gem.require_paths = ["lib"]
   gem.version       = DulyNoted::VERSION
-  gem.add_dependency "redis", "~> 2.2.2"
+  gem.add_dependency "redis", "~> 3.0.0"
   gem.add_development_dependency "rspec", "~> 2.8.0"
   gem.add_development_dependency "rake", "~> 0.9.2.2"
   gem.add_development_dependency "rb-fsevent", "~> 0.9.0"

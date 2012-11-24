@@ -30,5 +30,13 @@ describe DulyNoted::Helpers do
       encoded = Base64.encode64("http://google.de")
       Base64.decode64(DulyNoted.normalize(encoded)).should == "http://google.de"
     end
+
+    it "should handle symbols" do
+      DulyNoted.normalize(:sym).should == "sym"
+    end
+
+    it "should handle integers" do
+      DulyNoted.normalize(1).should == "1"
+    end
   end
 end

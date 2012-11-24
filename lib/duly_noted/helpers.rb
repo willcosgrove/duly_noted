@@ -9,10 +9,7 @@ module DulyNoted
     end
 
     def normalize(str)
-      if str.is_a?(Symbol)
-        str = str.to_s
-      end
-      str.gsub(/[^a-z0-9 =]/i, '').strip
+      str.to_s.gsub(/[^a-z0-9 =]/i, '').strip
     end
 
     def assemble_for(options)

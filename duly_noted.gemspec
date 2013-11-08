@@ -20,7 +20,7 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency "rb-fsevent", "~> 0.9.0"
   gem.add_development_dependency "guard-rspec", "~> 0.6.0"
   gem.add_development_dependency "guard-bundler", "~> 0.1.3"
-  gem.add_development_dependency "chronic", "~> 0.6.7"
+  gem.add_development_dependency "chronic", "~> 0.10.2"
   gem.add_development_dependency "timecop", "~> 0.3.5"
   gem.add_development_dependency "ruby_gntp", "~> 0.3.4"
 end

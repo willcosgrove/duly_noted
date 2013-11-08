@@ -332,6 +332,30 @@ module DulyNoted
     result
   end
 
+
+  # Returns the sum of meta_field
+  # 
+  #       5.times { DulyNoted.track "timed_page_views", :for => "home", :meta => {:duration => 10} }
+  #       5.times { DulyNoted.track "timed_page_views", :for => "contact_us", :meta => {:duration => 10} }
+  #       DulyNoted.sum_meta_field('timed_page_views', :duration) => 100
+  #       DulyNoted.sum_meta_field('timed_page_views', :duration, {:for => 'home'}) => 50
+
+
+  def sum_meta_field(metric_name, meta_field, options={})
+    options ||= {}
+    options = {:meta_fields => [meta_field]}.merge(options)
+    meta_hashes = query(metric_name, options)
+    result = 0
+
+    meta_hashes.each do |meta_hash|
+      result += meta_hash[meta_field.to_s].to_i
+    end
+    result
+  end
+
+
+
+
   # ##Behind the curtain (metaprogramming)
   # 
   # ###method_missing

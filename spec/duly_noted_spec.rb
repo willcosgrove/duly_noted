@@ -183,6 +183,17 @@ describe DulyNoted do
     end
   end
 
+  describe "#sum_meta_field" do
+    it "should return the sum of the meta field in the set" do
+      5.times { DulyNoted.track "timed_page_views", :for => "home", :meta => {:duration => 10} }
+      5.times { DulyNoted.track "timed_page_views", :for => "contact_us", :meta => {:duration => 10} }
+
+      DulyNoted.sum_meta_field('timed_page_views', :duration).should == 100
+      DulyNoted.sum_meta_field('timed_page_views', :duration, {:for => 'home'}).should == 50
+    end
+  end
+
+
   describe "#check_schema" do
     it "should update the database if the schema is off by a major release" do
       DulyNoted::VERSION = "2.0.0"
